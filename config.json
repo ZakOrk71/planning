@@ -1,0 +1,19 @@
+{
+  "_aide": "Fichier de configuration des cadences. 1 = jour travaillé (vacation), 0 = repos. Tu peux modifier les cycles ci-dessous si ta cadence reelle differe.",
+  "vacationMinutes": 728,
+  "vacationLabel": "12h08",
+  "cadences": {
+    "3-3": {
+      "label": "3-3 (Nuit)",
+      "type": "nuit",
+      "description": "3 vacations travaillees puis 3 repos.",
+      "cycle": [1, 1, 1, 0, 0, 0]
+    },
+    "2-2-3": {
+      "label": "2-2-3 (Jour)",
+      "type": "jour",
+      "description": "Rythme 2-2-3 sur 14 jours : 2 travail, 2 repos, 3 travail, 2 repos, 2 travail, 3 repos.",
+      "cycle": [1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0]
+    }
+  }
+}
