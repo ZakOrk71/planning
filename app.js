@@ -327,6 +327,10 @@ async function tryFetchJSON(path){
 
 /* ===================== Init ===================== */
 async function init(){
+  // sécurité : la fenêtre "jour" doit être fermée au démarrage
+  const mb = $("#modalBg"); mb.hidden = true; mb.style.display = "none";
+  $("#partielWrap").hidden = true; $("#partielWrap").style.display = "none";
+
   const cfg = await tryFetchJSON("config.json");
   if(cfg && cfg.cadences) CONFIG = cfg;
   const cg = await tryFetchJSON("conges.json");
@@ -565,11 +569,13 @@ function openModal(iso){
   partH.value = (cur && cur.minutes!=null) ? (cur.minutes/60) : "";
   togglePartiel();
 
-  $("#modalBg").hidden = false;
+  const mb = $("#modalBg"); mb.hidden = false; mb.style.display = "grid";
 }
 function togglePartiel(){
   const ty = modalSelected ? typeByCode(modalSelected) : null;
-  $("#partielWrap").hidden = !(ty && ty.partiel);
+  const show = !!(ty && ty.partiel);
+  const w = $("#partielWrap");
+  w.hidden = !show; w.style.display = show ? "flex" : "none";
 }
 function saveDay(){
   if(!modalDateISO) return;
@@ -585,7 +591,7 @@ function saveDay(){
   }
   save(); closeModal(); renderAll();
 }
-function closeModal(){ $("#modalBg").hidden = true; modalDateISO=null; modalSelected=null; }
+function closeModal(){ const mb=$("#modalBg"); mb.hidden = true; mb.style.display="none"; modalDateISO=null; modalSelected=null; }
 
 /* Statut d'un jour pour un planning donné (utilisé aussi pour l'équipe) */
 function cycleFor(key){ return (CONFIG.cadences[key] || CONFIG.cadences["2-2-3"]).cycle; }
