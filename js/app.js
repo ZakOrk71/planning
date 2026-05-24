@@ -42,6 +42,7 @@ let supa = null;          // client Supabase
 let cloudUser = null;     // utilisateur connecté
 let cloudSaveTimer = null;
 let presenceTimer = null;
+let cloudProfile = null;  // { display_name, role }
 let authMode = "login";   // "login" | "signup"
 
 /* -------- Etat de l'application -------- */
@@ -205,6 +206,8 @@ function wireProfiles(){
 /* ===== Mode CLOUD : formulaire de connexion ===== */
 function authFormHTML(){
   const signup = authMode==="signup";
+  const nameField = signup ? `
+      <div class="ctrl"><label>Nom affiché</label><input type="text" id="authName" placeholder="ex: Dupont, Brigade B…" maxlength="30" /></div>` : "";
   return `
     <div class="gate-head">
       <div class="shield">◈</div>
@@ -212,6 +215,7 @@ function authFormHTML(){
       <p class="muted">Email + mot de passe. Synchronisé sur tous tes appareils.</p></div>
     </div>
     <div class="auth-form">
+      ${nameField}
       <div class="ctrl"><label>Email</label><input type="email" id="authEmail" placeholder="prenom.nom@…" autocomplete="email" /></div>
       <div class="ctrl"><label>Mot de passe</label><input type="password" id="authPass" placeholder="••••••••" autocomplete="${signup?"new-password":"current-password"}" /></div>
       <p class="auth-msg" id="authMsg"></p>
@@ -237,10 +241,12 @@ async function doLogin(){
 }
 async function doSignup(){
   const email=$("#authEmail").value.trim(), password=$("#authPass").value;
+  const name=($("#authName")?$("#authName").value.trim():"");
+  if(!name){ setAuthMsg("Indique un nom affiché."); return; }
   if(!email||!password){ setAuthMsg("Email et mot de passe requis."); return; }
   if(password.length<6){ setAuthMsg("Mot de passe : 6 caractères minimum."); return; }
   setAuthMsg("Création…", false);
-  const { data, error } = await supa.auth.signUp({ email, password });
+  const { data, error } = await supa.auth.signUp({ email, password, options:{ data:{ display_name:name } } });
   if(error){ setAuthMsg(traduireErreur(error.message)); return; }
   if(!data.session){ setAuthMsg("Compte créé ! Vérifie ta boîte mail pour confirmer, puis connecte-toi.", false); authMode="login"; setTimeout(showGate,1800); }
 }
@@ -254,19 +260,37 @@ function traduireErreur(m){
 
 /* ===== Mode CLOUD : panneau compte (quand connecté) ===== */
 function accountPanelHTML(){
+  const dn = displayName();
+  const roleBadge = isAdmin() ? `<span class="role-badge admin">ADMIN</span>` : `<span class="role-badge">Membre</span>`;
   return `
     <div class="gate-head">
-      <div class="pavatar" style="width:42px;height:42px;font-size:1.1rem">${(cloudUser.email[0]||"?").toUpperCase()}</div>
-      <div><h3>Mon compte</h3><p class="muted">${escapeHtml(cloudUser.email)}</p></div>
+      <div class="pavatar" style="width:42px;height:42px;font-size:1.1rem">${(dn[0]||"?").toUpperCase()}</div>
+      <div><h3>${escapeHtml(dn)} ${roleBadge}</h3><p class="muted">${escapeHtml(cloudUser.email)}</p></div>
     </div>
-    <div class="modal-actions" style="justify-content:flex-start">
-      <button class="btn" id="acctClose">Fermer</button>
+    <div class="ctrl" style="margin-top:6px">
+      <label>Nom affiché</label>
+      <input type="text" id="acctName" maxlength="30" value="${escapeHtml(dn)}" />
+    </div>
+    <div class="modal-actions" style="justify-content:space-between;margin-top:14px">
       <button class="btn danger" id="acctLogout">Se déconnecter</button>
+      <span>
+        <button class="btn" id="acctClose">Fermer</button>
+        <button class="btn primary" id="acctSave">Enregistrer</button>
+      </span>
     </div>`;
 }
 function wireAccountPanel(){
   $("#acctClose").addEventListener("click", hideGate);
   $("#acctLogout").addEventListener("click", async ()=>{ await supa.auth.signOut(); });
+  $("#acctSave").addEventListener("click", async ()=>{
+    const name = $("#acctName").value.trim();
+    if(!name){ alert("Le nom ne peut pas être vide."); return; }
+    try{
+      await supa.rpc("set_display_name", { name });
+      cloudProfile = cloudProfile || {}; cloudProfile.display_name = name;
+      refreshChipCloud(); hideGate();
+    }catch(e){ alert("Erreur : "+e.message); }
+  });
 }
 
 /* ===== CLOUD : init, login, sauvegarde ===== */
@@ -284,14 +308,18 @@ async function initCloud(){
 
   supa.auth.onAuthStateChange((_evt, sess)=>{
     if(sess && sess.user){ if(!cloudUser || cloudUser.id!==sess.user.id) onCloudLogin(sess.user); }
-    else { cloudUser=null; stopPresence(); refreshChipCloud(); showGate(); }
+    else { cloudUser=null; cloudProfile=null; stopPresence(); refreshChipCloud(); showGate(); }
   });
 }
 async function onCloudLogin(user){
   cloudUser = user;
   hideGate();
-  refreshChipCloud();
   startPresence();
+  try{
+    const { data:prof } = await supa.from("profiles").select("display_name,role").eq("id", user.id).maybeSingle();
+    cloudProfile = prof || {};
+  }catch(e){ cloudProfile = {}; }
+  refreshChipCloud();
   // cache local d'abord (affichage instantané + hors-ligne)
   let cached=null; try{ cached=JSON.parse(localStorage.getItem("cloud_cache::"+user.id)); }catch(e){}
   if(cached){ state=Object.assign(freshState(), cached); syncInputsFromState(); renderAll(); }
@@ -313,8 +341,8 @@ function scheduleCloudSave(){
   }, 700);
 }
 function refreshChipCloud(){
-  const name = cloudUser ? cloudUser.email : "Connexion";
-  $("#pName").textContent = cloudUser ? name.split("@")[0] : name;
+  const name = cloudUser ? displayName() : "Connexion";
+  $("#pName").textContent = name;
   $("#pAvatar").textContent = (name[0]||"?").toUpperCase();
 }
 
@@ -611,7 +639,11 @@ function dayStatus(st, dateISO){
 
 /* ===================== Onglet ÉQUIPE ===================== */
 let teamGroups = [], selGroup = null, teamMonth = null, teamMembers = [], teamPlannings = {};
-function displayName(){ return cloudUser ? cloudUser.email.split("@")[0] : "Moi"; }
+function displayName(){
+  if(cloudProfile && cloudProfile.display_name) return cloudProfile.display_name;
+  return cloudUser ? cloudUser.email.split("@")[0] : "Moi";
+}
+function isAdmin(){ return !!(cloudProfile && cloudProfile.role === "admin"); }
 function leaveColor(code, st){
   const arr = (st && st.types) || state.types || [];
   const t = arr.find(x=>x.code===code);
@@ -819,7 +851,7 @@ async function renderMembersTab(){
 async function loadMembers(){
   let rows = [];
   try{
-    const { data, error } = await supa.from("profiles").select("id,email,created_at,last_seen").order("last_seen",{ascending:false});
+    const { data, error } = await supa.from("profiles").select("id,email,display_name,role,created_at,last_seen").order("last_seen",{ascending:false});
     if(error) throw error;
     rows = data || [];
   }catch(e){
@@ -827,19 +859,44 @@ async function loadMembers(){
     return;
   }
   const online = rows.filter(r=>onlineState(r.last_seen)==="on").length;
+  const admins = rows.filter(r=>r.role==="admin").length;
   $("#memStats").innerHTML = `
     <div class="stat"><b>${rows.length}</b><span>inscrits</span></div>
-    <div class="stat good"><b>${online}</b><span>en ligne maintenant</span></div>`;
+    <div class="stat good"><b>${online}</b><span>en ligne maintenant</span></div>
+    <div class="stat"><b>${admins}</b><span>admin(s)</span></div>`;
   if(!rows.length){ $("#memList").innerHTML = `<p class="empty">Aucun inscrit pour le moment.</p>`; return; }
+
+  const admin = isAdmin();
   $("#memList").innerHTML = rows.map(r=>{
     const st = onlineState(r.last_seen);
     const isMe = r.id===cloudUser.id;
+    const dn = r.display_name || (r.email||"—").split("@")[0];
     const label = st==="on" ? "en ligne" : timeAgo(r.last_seen);
-    return `<div class="posed-row">
-      <span class="mem-id"><span class="online ${st}"></span>${escapeHtml(r.email||"—")}${isMe?' <em>(moi)</em>':''}</span>
-      <span class="mem-meta">${label}</span>
+    const badge = r.role==="admin" ? `<span class="role-badge admin">ADMIN</span>` : "";
+    let actions = "";
+    if(admin){
+      const toggle = r.role==="admin"
+        ? `<button class="mini" data-role="user" data-id="${r.id}">retirer admin</button>`
+        : `<button class="mini" data-role="admin" data-id="${r.id}">promouvoir admin</button>`;
+      actions = `<span class="mem-actions">${toggle}<button class="mini danger" data-reset="${r.id}">réinit. planning</button></span>`;
+    }
+    return `<div class="posed-row mem-row">
+      <span class="mem-id"><span class="online ${st}"></span><b>${escapeHtml(dn)}</b>${badge}${isMe?' <em>(moi)</em>':''}<small class="mem-email">${escapeHtml(r.email||"")}</small></span>
+      <span class="mem-right"><span class="mem-meta">${label}</span>${actions}</span>
     </div>`;
   }).join("");
+
+  if(admin){
+    $$("#memList [data-role]").forEach(b=> b.addEventListener("click", async ()=>{
+      try{ await supa.rpc("set_role",{ target:b.dataset.id, new_role:b.dataset.role }); await loadMembers(); }
+      catch(e){ alert("Erreur : "+e.message); }
+    }));
+    $$("#memList [data-reset]").forEach(b=> b.addEventListener("click", async ()=>{
+      if(!confirm("Réinitialiser (vider) le planning de ce membre ?")) return;
+      try{ await supa.rpc("admin_reset_planning",{ target:b.dataset.reset }); alert("Planning réinitialisé."); }
+      catch(e){ alert("Erreur : "+e.message); }
+    }));
+  }
 }
 
 function renderHours(){
