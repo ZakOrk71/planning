@@ -16,6 +16,7 @@
   --shadow:0 14px 40px -18px rgba(0,0,0,.8);
 }
 *{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none !important}
 html{-webkit-text-size-adjust:100%}
 body{
   font-family:"Public Sans",system-ui,sans-serif;
