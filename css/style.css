@@ -72,6 +72,7 @@ select,input[type=date],input[type=number],input[type=text],input[type=email],in
   background:var(--surface2);border:1px solid var(--line);border-radius:var(--r-sm);color:var(--ink);
   padding:12px 13px;font:inherit;font-size:.95rem;width:100%;transition:.14s}
 select:focus,input:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px var(--accent-soft)}
+input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;text-align:left;overflow:hidden}
 .ctrl-note{color:var(--muted);font-size:.82rem;font-style:italic;margin:0}
 
 .btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:12px 18px;border-radius:var(--r-sm);
