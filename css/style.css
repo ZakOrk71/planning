@@ -22,7 +22,7 @@ html{-webkit-text-size-adjust:100%}
 body{
   font-family:"Public Sans",system-ui,-apple-system,sans-serif;
   background:var(--bg);color:var(--ink);min-height:100vh;line-height:1.5;
-  -webkit-tap-highlight-color:transparent;font-size:16px;
+  -webkit-tap-highlight-color:transparent;font-size:16px;overflow-x:hidden;
 }
 ::selection{background:rgba(59,130,246,.35)}
 .grain{display:none}
@@ -76,6 +76,7 @@ h3{font-family:"Archivo",sans-serif;font-size:1rem;margin:16px 0 10px}
 
 /* ---------- Controls ---------- */
 .controls{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:end}
+.controls > .ctrl:first-child{grid-column:1/-1}
 .ctrl{display:flex;flex-direction:column;gap:7px;min-width:0}
 .ctrl label{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700}
 select,input[type=date],input[type=number],input[type=text],input[type=email],input[type=password],.add-type input{
