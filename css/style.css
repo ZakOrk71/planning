@@ -40,9 +40,17 @@ body{font-family:"Plus Jakarta Sans",system-ui,-apple-system,sans-serif;backgrou
 .appbar-title h1{font-size:1.2rem;font-weight:800;letter-spacing:-.01em;line-height:1.1}
 .appbar-title p{color:var(--muted);font-size:.78rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .appbar-title strong{color:var(--ink);font-weight:700}
+.appbar-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.icon-btn{width:40px;height:40px;flex:0 0 auto;display:grid;place-items:center;border:1px solid var(--line);
+  background:var(--surface);color:var(--ink);border-radius:50%;cursor:pointer;box-shadow:var(--sh-sm);transition:.15s}
+.icon-btn:hover{border-color:var(--line2);color:var(--accent)}
+.icon-btn:active{transform:scale(.95)}
+.icon-btn svg{width:20px;height:20px}
+.icon-btn.spin svg{animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .profile-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);
   color:var(--ink);padding:5px 12px 5px 5px;border-radius:999px;font:inherit;font-weight:600;font-size:.85rem;cursor:pointer;
-  box-shadow:var(--sh-sm);transition:.15s;max-width:46vw}
+  box-shadow:var(--sh-sm);transition:.15s;max-width:38vw}
 .profile-chip:hover{border-color:var(--line2)}
 .profile-chip #pName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pavatar{width:28px;height:28px;flex:0 0 auto;border-radius:50%;display:grid;place-items:center;color:#fff;
