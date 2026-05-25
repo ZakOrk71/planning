@@ -415,6 +415,21 @@ function bindProfileEvents(){
     const canClose = CLOUD ? !!cloudUser : !!currentProfileId;
     if(e.target.id==="profileGate" && canClose) hideGate();
   });
+  const rb = $("#refreshBtn");
+  if(rb) rb.addEventListener("click", ()=> hardRefresh(rb));
+}
+
+async function hardRefresh(btn){
+  if(btn) btn.classList.add("spin");
+  // 1) on s'assure que les données en cours sont bien enregistrées dans le cloud
+  try{
+    if(CLOUD && cloudUser){
+      await supa.from("plannings").upsert({ user_id:cloudUser.id, data:state, updated_at:new Date().toISOString() });
+    }
+  }catch(e){ /* on recharge quand même */ }
+  // 2) rechargement en contournant le cache (récupère la dernière version mise en ligne)
+  const base = location.origin + location.pathname;
+  location.replace(base + "?r=" + Date.now());
 }
 
 function buildCadenceSelect(){
