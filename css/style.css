@@ -240,6 +240,32 @@ input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;max-width:1
 .online{width:9px;height:9px;border-radius:50%;display:inline-block;background:#c2c8d4;flex:0 0 auto}
 .online.on{background:var(--ok)} .online.idle{background:var(--work)} .online.off{background:#c2c8d4}
 
+/* ---------- Prochain cycle ---------- */
+.cyc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.cyc-day{background:var(--surface2);border:1px solid var(--line);border-radius:var(--r-sm);padding:12px 13px}
+.cyc-d{font-weight:800;font-size:.82rem;text-transform:capitalize;margin-bottom:6px}
+.cyc-n{font-size:.84rem} .cyc-n b{font-size:1.25rem;font-weight:800;color:var(--ok)}
+.cyc-l{font-size:.78rem;color:var(--muted)}
+
+/* ---------- Équipages ---------- */
+.crew-picker{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.cp-label{font-size:.8rem;color:var(--muted);font-weight:700}
+.mini.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.crew-block{margin-bottom:16px}
+.crew-block:last-child{margin-bottom:0}
+.crew-title{display:flex;align-items:center;gap:8px;font-weight:800;font-size:.95rem;margin-bottom:8px}
+.crew-count{background:var(--accent-soft);color:var(--accent2);font-size:.7rem;font-weight:800;padding:2px 9px;border-radius:999px}
+.crew-mem,.cc-head{display:flex;align-items:center;gap:10px;padding:7px 11px;border-radius:10px}
+.crew-mem{background:var(--surface2);border:1px solid var(--line);margin-bottom:6px}
+.cc-head{padding-top:0;padding-bottom:2px}
+.cm-name{flex:1;min-width:90px;font-weight:600;font-size:.88rem}
+.cm-name em{color:var(--accent);font-style:normal;font-weight:700;font-size:.78rem}
+.cc-row{display:inline-flex;gap:4px}
+.cc-h{width:22px;text-align:center;font-size:.66rem;color:var(--muted);font-weight:700}
+.cc{width:22px;height:22px;border-radius:6px;display:inline-grid;place-items:center;font-size:.62rem;font-weight:800;color:#fff}
+.cc.work{background:#f0a23c} .cc.rest{background:#e7eaf1} .cc.out{background:#f4f5f9;border:1px dashed var(--line)} .cc.lv{color:#fff}
+.crew-set{padding:5px 8px;border-radius:8px;font-size:.8rem;border:1px solid var(--line);background:#fff}
+
 /* ---------- Bottom nav ---------- */
 .bottomnav{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;justify-content:space-around;
   background:rgba(255,255,255,.94);backdrop-filter:blur(14px);border-top:1px solid var(--line);
