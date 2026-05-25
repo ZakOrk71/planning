@@ -733,7 +733,7 @@ async function leaveGroup(gid){
 async function openGroup(gid){
   selGroup = teamGroups.find(g=>g.id===gid) || { id:gid, name:"Brigade", code:"" };
   try{
-    const { data:mem } = await supa.from("group_members").select("user_id,display_name").eq("group_id", gid);
+    const { data:mem } = await supa.from("group_members").select("user_id,display_name,crew").eq("group_id", gid);
     teamMembers = mem || [];
     const ids = teamMembers.map(m=>m.user_id);
     teamPlannings = {};
@@ -780,7 +780,7 @@ function renderTeam(){
     rows += `<tr><td class="mname${isMe?' me':''}">${escapeHtml(mem.display_name||'?')}</td>${cells}</tr>`;
   });
 
-  view.innerHTML = `
+  const gridCard = `
    <div class="card">
      <div class="team-head">
        <div><h2>${escapeHtml(selGroup.name)}</h2>
@@ -793,13 +793,106 @@ function renderTeam(){
      </div>
      <div class="team-scroll"><table class="team-grid"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>
      <div class="legend" style="margin-top:14px">
-       <span class="lg"><span class="dot" style="background:#f59e0b"></span>Vacation</span>
-       <span class="lg"><span class="dot" style="background:#1c2740"></span>Repos</span>
-       <span class="lg"><span class="dot" style="background:#2f81f7"></span>Congé posé (lettre = code)</span>
+       <span class="lg"><span class="dot" style="background:#f0a23c"></span>Vacation</span>
+       <span class="lg"><span class="dot" style="background:#e7eaf1"></span>Repos</span>
+       <span class="lg"><span class="dot" style="background:#4f46e5"></span>Congé (lettre = code)</span>
      </div>
    </div>`;
+
+  const cycleDays = computeNextCycle(state);
+  view.innerHTML = nextCycleHTML(cycleDays) + crewsHTML(cycleDays) + gridCard;
+
   $("#tmPrev").addEventListener("click", ()=>{ teamMonth = new Date(y, m-1, 1); renderTeam(); });
   $("#tmNext").addEventListener("click", ()=>{ teamMonth = new Date(y, m+1, 1); renderTeam(); });
+  $$("#teamView [data-mine]").forEach(b=> b.addEventListener("click", ()=> setMyCrew(b.dataset.mine)));
+  $$("#teamView .crew-set").forEach(s=> s.addEventListener("change", ()=> setMemberCrew(s.dataset.uid, s.value)));
+}
+
+/* Prochain cycle = prochain bloc de vacations du planning de l'utilisateur */
+function computeNextCycle(st){
+  if(!st || !st.startDate || !st.endDate) return [];
+  const end = parseISO(st.endDate);
+  const isW = (dt)=>{ const s = dayStatus(st, isoOf(dt)); return s.inRange && s.work; };
+  let d = new Date(); d.setHours(12,0,0,0);
+  let g = 0;
+  if(isW(d)){ while(isW(d) && g++<500){ d.setDate(d.getDate()+1); } } // sortir du cycle en cours
+  while(!isW(d) && d <= end && g++<900){ d.setDate(d.getDate()+1); }   // aller au prochain jour travaillé
+  const out = [];
+  while(isW(d) && d <= end && out.length < 12){ out.push(isoOf(d)); d.setDate(d.getDate()+1); }
+  return out;
+}
+function cycleCells(st, days){
+  return days.map(iso=>{
+    const s = dayStatus(st, iso);
+    if(!s.inRange) return `<span class="cc out"></span>`;
+    if(s.leave) return `<span class="cc lv" style="background:${leaveColor(s.leave.code, st)}" title="${escapeHtml(s.leave.code)}">${escapeHtml(s.leave.code[0])}</span>`;
+    if(s.work) return `<span class="cc work" title="Vacation"></span>`;
+    return `<span class="cc rest" title="Repos"></span>`;
+  }).join("");
+}
+function nextCycleHTML(days){
+  if(!days.length) return `<div class="card"><div class="card-head"><h2>Prochain cycle</h2></div><p class="empty">Génère d'abord ton planning (onglet Planning) pour calculer ton prochain cycle.</p></div>`;
+  const dstr = capit(parseISO(days[0]).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}))
+    + " → " + capit(parseISO(days[days.length-1]).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}));
+  const cols = days.map(iso=>{
+    let present=0, leave=0;
+    teamMembers.forEach(mem=>{ const s=dayStatus(teamPlannings[mem.user_id]||{}, iso); if(s.inRange && s.work){ if(s.leave) leave++; else present++; } });
+    const d = parseISO(iso);
+    return `<div class="cyc-day">
+      <div class="cyc-d">${capit(d.toLocaleDateString("fr-FR",{weekday:"short"}))} ${d.getDate()}/${d.getMonth()+1}</div>
+      <div class="cyc-n"><b>${present}</b> au travail</div>
+      <div class="cyc-l">${leave} en congé</div></div>`;
+  }).join("");
+  return `<div class="card">
+    <div class="card-head"><h2>Prochain cycle</h2></div>
+    <p class="muted">${days.length} vacation(s) · ${dstr}</p>
+    <div class="cyc-grid">${cols}</div></div>`;
+}
+function crewsHTML(days){
+  const order = ["Alpha","Bravo","Charlie"];
+  const groups = {};
+  teamMembers.forEach(m=>{ const c = m.crew || "__none"; (groups[c]=groups[c]||[]).push(m); });
+  const keys = [...order.filter(k=>groups[k]),
+                ...Object.keys(groups).filter(k=>!order.includes(k) && k!=="__none"),
+                ...(groups["__none"]?["__none"]:[])];
+  const myCrew = (teamMembers.find(m=>m.user_id===cloudUser.id)||{}).crew || "";
+  const admin = isAdmin();
+  const dayHead = days.map(iso=>{ const d=parseISO(iso); return `<span class="cc-h">${d.getDate()}</span>`; }).join("");
+
+  const body = keys.length ? keys.map(k=>{
+    const title = k==="__none" ? "Sans équipage" : `${escapeHtml(selGroup.name)} ${k}`;
+    const list = groups[k].map(mem=>{
+      const st = teamPlannings[mem.user_id] || {};
+      const isMe = mem.user_id===cloudUser.id;
+      const cells = days.length ? `<span class="cc-row">${cycleCells(st, days)}</span>` : "";
+      let sel = "";
+      if(admin){
+        sel = `<select class="crew-set" data-uid="${mem.user_id}"><option value="">—</option>`
+          + ["Alpha","Bravo","Charlie"].map(c=>`<option value="${c}"${mem.crew===c?" selected":""}>${c}</option>`).join("")
+          + `</select>`;
+      }
+      return `<div class="crew-mem"><span class="cm-name">${escapeHtml(mem.display_name||'?')}${isMe?' <em>(moi)</em>':''}</span>${cells}${sel}</div>`;
+    }).join("");
+    return `<div class="crew-block"><div class="crew-title">${title}<span class="crew-count">${groups[k].length}</span></div>
+      ${days.length?`<div class="cc-head"><span class="cm-name"></span><span class="cc-row">${dayHead}</span></div>`:""}
+      ${list}</div>`;
+  }).join("") : `<p class="empty">Aucun membre.</p>`;
+
+  const picker = `<div class="crew-picker"><span class="cp-label">Mon équipage :</span>`
+    + ["Alpha","Bravo","Charlie"].map(c=>`<button class="mini${myCrew===c?' on':''}" data-mine="${c}">${c}</button>`).join("")
+    + `<button class="mini${!myCrew?' on':''}" data-mine="">Aucun</button></div>`;
+
+  return `<div class="card">
+    <div class="card-head"><h2>Équipages — prochain cycle</h2></div>
+    ${picker}${body}</div>`;
+}
+async function setMyCrew(c){
+  try{ await supa.rpc("set_crew",{ gid:selGroup.id, crew_name:c }); await openGroup(selGroup.id); }
+  catch(e){ alert("Erreur : "+e.message); }
+}
+async function setMemberCrew(uid, c){
+  try{ await supa.rpc("set_member_crew",{ gid:selGroup.id, target:uid, crew_name:c }); await openGroup(selGroup.id); }
+  catch(e){ alert("Erreur : "+e.message); }
 }
 /* ===================== Présence + MEMBRES ===================== */
 async function pingPresence(){
