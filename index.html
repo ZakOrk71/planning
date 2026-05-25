@@ -3,151 +3,147 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
-  <title>Planning Police — 3-3 / 2-2-3</title>
-  <meta name="theme-color" content="#0b0e13" />
+  <title>Planning — 3-3 / 2-2-3</title>
+  <meta name="theme-color" content="#ffffff" />
   <meta name="description" content="Planning des vacations police (3-3 / 2-2-3), congés, heures et équipe." />
-  <!-- Plein écran quand ajouté à l'écran d'accueil -->
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Planning" />
-  <link rel="manifest" href="manifest.json?v=8" />
+  <link rel="manifest" href="manifest.json?v=10" />
   <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAIAAADdvvtQAAADDUlEQVR4nO3cMW7bQBBAUTpIkzM5V3PjXC1nctoUAgRBSQxbXwFnqfcqVQuC+7WGRI+enl/fNrjVl70vgLUJiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiL5uvcF3NPPl2+nF99//Nr3Si7NvKp7Oc4JdN6nq9f7mnlVd3ScgNiFgEgERCIgEgGRCIhEQCQCIhEQiYBIBERynIAuH1XOeWw586ru6On59W3va2BhxzmB2IWASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQyaDfBzrkr5/8P0P+QdYJRCIgEgGRCIhEQCQCIhEQiYBIBEQiIJJBjzI+7vJb/NsegExY4RjWO4GungHd8EhowgqHsVhAf92qT+3fhBWOZKWA3tmkD+7fhBUOZqWAGEhAJAIiWSmgdz4tf/CD9IQVDmalgLZ/bNKndm7CCkeyWEDbH1t1w85NWOEwlvwmum/YhBWOYb0TiFEERCIgEgGRCIhEQCQCIhEQiYBIBEQiIJIln4VNmKkwlXGy3gk0YabCVMbZYgFNmKkwlXFppYAmzFSYyriyUkAMJCASAZGsFNCEmQpTGVdWCmibMVNhKuPSYgFtM2YqTGWcLflN9ISZikeO5tJ6JxCjCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiGRQQI852XmbOfdqUECsaFZAc95Yk426S7MC2obdnYGm3Z9xAbGWiXNhpzeZwasr086ek7kn0Mz7tZexd2PiCXTmKNoGp3MyOqCT4Xfwwc39E8YSBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGR/AYL6LiFKhOywwAAAABJRU5ErkJggg==" />
-  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAIAAADdvvtQAAADDUlEQVR4nO3cMW7bQBBAUTpIkzM5V3PjXC1nctoUAgRBSQxbXwFnqfcqVQuC+7WGRI+enl/fNrjVl70vgLUJiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiL5uvcF3NPPl2+nF99//Nr3Si7NvKp7Oc4JdN6nq9f7mnlVd3ScgNiFgEgERCIgEgGRCIhEQCQCIhEQiYBIBERynIAuH1XOeWw586ru6On59W3va2BhxzmB2IWASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQyaDfBzrkr5/8P0P+QdYJRCIgEgGRCIhEQCQCIhEQiYBIBEQiIJJBjzI+7vJb/NsegExY4RjWO4GungHd8EhowgqHsVhAf92qT+3fhBWOZKWA3tmkD+7fhBUOZqWAGEhAJAIiWSmgdz4tf/CD9IQVDmalgLZ/bNKndm7CCkeyWEDbH1t1w85NWOEwlvwmum/YhBWOYb0TiFEERCIgEgGRCIhEQCQCIhEQiYBIBEQiIJIln4VNmKkwlXGy3gk0YabCVMbZYgFNmKkwlXFppYAmzFSYyriyUkAMJCASAZGsFNCEmQpTGVdWCmibMVNhKuPSYgFtM2YqTGWcLflN9ISZikeO5tJ6JxCjCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiGRQQI852XmbOfdqUECsaFZAc95Yk426S7MC2obdnYGm3Z9xAbGWiXNhpzeZwasr086ek7kn0Mz7tZexd2PiCXTmKNoGp3MyOqCT4Xfwwc39E8YSBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGR/AYL6LiFKhOywwAAAABJRU5ErkJggg==" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=9" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css?v=10" />
 </head>
 <body>
-  <div class="grain"></div>
 
-  <header class="topbar">
-    <div class="brand">
-      <div class="shield">◈</div>
-      <div>
-        <h1>PLANNING</h1>
-        <p>Cadences 3-3 / 2-2-3 — vacation <strong id="vacLabel">12h08</strong></p>
+  <header class="appbar">
+    <div class="appbar-brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
+      </div>
+      <div class="appbar-title">
+        <h1>Planning</h1>
+        <p>3-3 / 2-2-3 · vacation <strong id="vacLabel">12h08</strong></p>
       </div>
     </div>
-    <nav class="tabs">
-      <button class="tab active" data-tab="planning">Planning</button>
-      <button class="tab" data-tab="heures">Heures &amp; calcul</button>
-      <button class="tab" data-tab="equipe">Équipe</button>
-      <button class="tab" data-tab="membres">Membres</button>
-      <button class="tab" data-tab="reglages">Congés &amp; réglages</button>
-      <button class="profile-chip" id="profileChip" title="Changer de profil">
-        <span class="pavatar" id="pAvatar">?</span>
-        <span id="pName">Profil</span>
-        <span class="pcaret">▾</span>
-      </button>
-    </nav>
+    <button class="profile-chip" id="profileChip" title="Mon compte">
+      <span class="pavatar" id="pAvatar">?</span>
+      <span id="pName">Profil</span>
+    </button>
   </header>
 
-  <!-- ===== Écran profil / connexion ===== -->
   <div class="modal-bg gate" id="profileGate" hidden>
     <div class="modal card gate-card" id="gateCard"></div>
   </div>
 
   <main>
-    <!-- ============ PLANNING ============ -->
     <section class="panel active" id="tab-planning">
-      <div class="controls card">
-        <div class="ctrl">
-          <label>Cadence</label>
-          <select id="cadenceSelect"></select>
+      <div class="card">
+        <div class="card-head"><h2>Configurer le planning</h2></div>
+        <div class="controls">
+          <div class="ctrl span2">
+            <label>Cadence</label>
+            <select id="cadenceSelect"></select>
+          </div>
+          <div class="ctrl">
+            <label>1er jour travaillé</label>
+            <input type="date" id="startDate" />
+          </div>
+          <div class="ctrl">
+            <label>Fin du planning</label>
+            <input type="date" id="endDate" />
+          </div>
+          <div class="ctrl-note span2" id="cadenceNote"></div>
+          <button class="btn primary block span2" id="genBtn">Générer le planning</button>
         </div>
-        <div class="ctrl">
-          <label>1er jour travaillé</label>
-          <input type="date" id="startDate" />
-        </div>
-        <div class="ctrl">
-          <label>Fin du planning</label>
-          <input type="date" id="endDate" />
-        </div>
-        <button class="btn primary" id="genBtn">Générer le planning</button>
-        <div class="ctrl-note" id="cadenceNote"></div>
       </div>
 
+      <div class="summary" id="planSummary"></div>
       <div class="legend" id="legend"></div>
-
-      <div class="summary card" id="planSummary"></div>
-
       <div id="calendar"></div>
     </section>
 
-    <!-- ============ HEURES ============ -->
     <section class="panel" id="tab-heures">
       <div class="card">
-        <h2>Compteur d'heures</h2>
-        <p class="muted">Saisis les heures qu'il te reste. L'appli déduit ce que tu as déjà posé sur le planning et calcule combien de vacations tu peux encore poser.</p>
+        <div class="card-head"><h2>Compteur d'heures</h2></div>
+        <p class="muted">Saisis les heures qu'il te reste. L'appli déduit ce que tu as déjà posé et calcule combien de vacations tu peux encore poser.</p>
         <div class="hours-input">
-          <div class="ctrl">
-            <label>Heures restantes</label>
-            <input type="number" id="remH" min="0" step="1" placeholder="0" />
-          </div>
+          <div class="ctrl"><label>Heures restantes</label><input type="number" id="remH" min="0" step="1" placeholder="0" /></div>
           <span class="hsep">h</span>
-          <div class="ctrl">
-            <label>Minutes</label>
-            <input type="number" id="remM" min="0" max="59" step="1" placeholder="0" />
-          </div>
-          <button class="btn" id="saveHours">Enregistrer</button>
+          <div class="ctrl"><label>Minutes</label><input type="number" id="remM" min="0" max="59" step="1" placeholder="0" /></div>
+          <button class="btn primary" id="saveHours">Enregistrer</button>
         </div>
       </div>
-
       <div class="stats" id="hourStats"></div>
-
       <div class="card">
-        <h2>Détail de ce qui est posé</h2>
+        <div class="card-head"><h2>Ce qui est posé</h2></div>
         <div id="posedList" class="posed-list"></div>
       </div>
     </section>
 
-    <!-- ============ EQUIPE ============ -->
     <section class="panel" id="tab-equipe">
       <div id="teamRoot"></div>
     </section>
 
-    <!-- ============ MEMBRES ============ -->
     <section class="panel" id="tab-membres">
       <div id="membersRoot"></div>
     </section>
 
-    <!-- ============ REGLAGES ============ -->
     <section class="panel" id="tab-reglages">
       <div class="card">
-        <h2>Types de congés / absences</h2>
+        <div class="card-head"><h2>Types de congés / absences</h2></div>
         <p class="muted">Ajoute, modifie ou supprime. « Consomme heures » : retire du compteur. « Minutes » : durée retirée (728 = une vacation de 12h08).</p>
         <div class="types-table" id="typesTable"></div>
-
         <h3 class="add-title">Ajouter un type</h3>
         <div class="add-type">
           <input id="ntCode" placeholder="Code (ex: CA)" maxlength="6" />
           <input id="ntLabel" placeholder="Libellé" />
-          <input id="ntColor" type="color" value="#2f81f7" />
+          <input id="ntColor" type="color" value="#4f46e5" />
           <label class="chk"><input type="checkbox" id="ntConsume" checked /> consomme heures</label>
           <input id="ntMinutes" type="number" value="728" min="0" title="minutes" />
           <label class="chk"><input type="checkbox" id="ntPartiel" /> partiel</label>
           <button class="btn primary" id="addType">Ajouter</button>
         </div>
       </div>
-
       <div class="card">
-        <h2>Sauvegarde &amp; fichiers JSON</h2>
-        <p class="muted">Tes données sont gardées dans le navigateur. Tu peux aussi les exporter/importer en JSON.</p>
+        <div class="card-head"><h2>Sauvegarde &amp; fichiers JSON</h2></div>
+        <p class="muted">Tes données sont gardées en ligne (compte) ou dans le navigateur. Tu peux aussi exporter/importer en JSON.</p>
         <div class="io-row">
           <button class="btn" id="expConges">Exporter conges.json</button>
           <button class="btn" id="expAll">Exporter mes données</button>
-          <label class="btn file">Importer un JSON
-            <input type="file" id="impFile" accept="application/json" hidden />
-          </label>
+          <label class="btn file">Importer un JSON<input type="file" id="impFile" accept="application/json" hidden /></label>
           <button class="btn danger" id="resetAll">Tout réinitialiser</button>
         </div>
       </div>
     </section>
   </main>
 
-  <!-- ===== Modale jour ===== -->
+  <nav class="bottomnav">
+    <button class="tab active" data-tab="planning">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
+      <span>Planning</span>
+    </button>
+    <button class="tab" data-tab="heures">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span>Heures</span>
+    </button>
+    <button class="tab" data-tab="equipe">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 20c0-2.6-1.6-4.8-3.8-5.6"/></svg>
+      <span>Équipe</span>
+    </button>
+    <button class="tab" data-tab="membres">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M5.5 16c.6-1.6 1.9-2.5 3-2.5s2.4.9 3 2.5M14 9h4M14 13h4"/></svg>
+      <span>Membres</span>
+    </button>
+    <button class="tab" data-tab="reglages">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.3-2.6h-4l-.3 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.3 2.6h4l.3-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/></svg>
+      <span>Réglages</span>
+    </button>
+  </nav>
+
   <div class="modal-bg" id="modalBg" hidden>
     <div class="modal card">
       <h3 id="modalDate"></h3>
@@ -165,8 +161,8 @@
     </div>
   </div>
 
-  <footer class="foot">Planning indicatif — vérifie toujours avec ta hiérarchie / RH. Données stockées localement sur ton appareil. · v9</footer>
-  <script src="js/config.js?v=8"></script>
-  <script src="js/app.js?v=8"></script>
+  <span class="vbadge">v10</span>
+  <script src="js/config.js?v=10"></script>
+  <script src="js/app.js?v=10"></script>
 </body>
 </html>
