@@ -425,6 +425,16 @@ input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;max-width:1
 .vbadge{position:fixed;right:10px;bottom:calc(var(--nav-h) + var(--sb) + 6px);z-index:25;font-size:.6rem;font-weight:700;
   color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:2px 8px;opacity:.7}
 
+/* ---------- Feuille — équipages ---------- */
+.fc-crews{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px}
+.fc-crew-block{flex:1 0 130px;background:var(--surface2);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px}
+.fc-crew-hd{font-weight:800;font-size:.76rem;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);margin-bottom:9px}
+.fc-crew-unassigned .fc-crew-hd{color:var(--muted)}
+.fc-crew-body{display:flex;flex-direction:column;gap:7px}
+.fc-crew-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.fc-crew-assign{padding:5px 8px;border-radius:8px;font-size:.8rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;cursor:pointer}
+.fc-add-crew{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.fc-add-crew-inp{flex:1;min-width:140px;padding:9px 12px;border-radius:10px;font:inherit;font-size:.88rem;border:1px solid var(--line);background:var(--surface2);color:var(--ink)}
 /* ---------- Feuille de cycle ---------- */
 .fc-day{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:14px;overflow:hidden;box-shadow:var(--sh)}
 .fc-day-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;
@@ -453,6 +463,17 @@ input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;max-width:1
   font:inherit;font-size:.9rem;padding:10px 12px;resize:vertical;min-height:54px;transition:.14s}
 .fc-notes:focus{outline:none;border-color:var(--accent);background:var(--surface)}
 .fc-notes-ro{font-size:.9rem;color:var(--ink);margin:0}
+/* Sport + manual absent */
+.fc-sport-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px}
+.fc-sport-row select,.fc-sport-row input[type=time]{padding:8px 10px;border-radius:10px;font:inherit;font-size:.88rem;border:1px solid var(--line);background:var(--surface2);color:var(--ink);transition:.14s}
+.fc-sport-row select:focus,.fc-sport-row input:focus{outline:none;border-color:var(--accent)}
+.fc-sport-ro{font-size:.9rem;font-weight:600}
+.fc-add-absent{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:9px;padding-top:9px;border-top:1px dashed var(--line2)}
+.fc-add-absent input,.fc-add-absent select{padding:8px 10px;border-radius:10px;font:inherit;font-size:.84rem;border:1px solid var(--line);background:var(--surface2);color:var(--ink)}
+.fc-add-absent input{flex:1;min-width:100px}
+.fc-absent-rm{background:none;border:none;color:var(--danger);font-weight:800;cursor:pointer;padding:1px 4px;font-size:.85rem;line-height:1;transition:.1s}
+.fc-absent-rm:hover{opacity:.7}
+.fc-absent-item.manual{border-color:var(--line2);background:var(--bg)}
 
 /* ---------- Brigade member assignment (admin) ---------- */
 .brig-row-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;width:100%}
