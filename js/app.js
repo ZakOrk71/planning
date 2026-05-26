@@ -461,6 +461,7 @@ function bindEvents(){
     if(t.dataset.tab==="membres") renderMembersTab();
     if(t.dataset.tab==="reglages") renderTypes();
     if(t.dataset.tab==="admin") renderAdminTab();
+    if(t.dataset.tab==="feuille") renderCycleTab();
   }));
 
   $("#cadenceSelect").addEventListener("change", e=>{ state.cadence=e.target.value; updateCadenceNote(); });
@@ -724,6 +725,7 @@ function dayStatus(st, dateISO){
 
 /* ===================== Onglet ÉQUIPE ===================== */
 let teamGroups = [], selGroup = null, teamMonth = null, teamMembers = [], teamPlannings = {};
+let cycleGroups = [], cycleSelGid = null, cycleStartDate = null, cycleNotes = {};
 function displayName(){
   if(cloudProfile && cloudProfile.display_name) return cloudProfile.display_name;
   return cloudUser ? cloudUser.email.split("@")[0] : "Moi";
@@ -1438,15 +1440,29 @@ function adminRenderBrigadeList(){
     const crews = {Alpha:0,Bravo:0,Charlie:0};
     mems.forEach(m=>{ if(m.crew&&crews[m.crew]!==undefined) crews[m.crew]++; });
     const crewStr = Object.entries(crews).filter(([,n])=>n>0).map(([c,n])=>`${c[0]}:${n}`).join(" ") || "—";
+    const memInBrigIds = new Set(mems.map(m=>m.user_id));
+    const notIn = adminAllMembers.filter(m=>!memInBrigIds.has(m.id));
+    const addOpts = notIn.length
+      ? `<option value="">+ Ajouter un membre…</option>`+notIn.map(m=>`<option value="${m.id}">${escapeHtml(m.display_name||(m.email||"?").split("@")[0])}</option>`).join("")
+      : `<option value="">— Tous déjà dans la brigade —</option>`;
+    const memList = mems.length ? mems.map(m=>`<span class="brig-mem-chip">${escapeHtml(m.display_name||"?")}
+      <button class="brig-kick" data-uid="${m.user_id}" data-gid="${g.id}" title="Retirer">×</button></span>`).join("") : `<span class="empty">Aucun membre</span>`;
     return `<div class="admin-brigade-row">
-      <span class="grp-name">${escapeHtml(g.name)}</span>
-      <span class="grp-code">code <b>${g.code}</b></span>
-      <span class="admin-brigade-crew">${crewStr}</span>
-      <span class="admin-brigade-count">${mems.length} membre(s)</span>
-      <span class="grp-act">
-        <button class="btn small" data-admin-plan="${g.id}">Voir planning</button>
-        <button class="mini danger" data-admin-del-brig="${g.id}">Supprimer</button>
-      </span>
+      <div class="brig-row-top">
+        <span class="grp-name">${escapeHtml(g.name)}</span>
+        <span class="grp-code">code <b>${g.code}</b></span>
+        <span class="admin-brigade-crew">${crewStr}</span>
+        <span class="admin-brigade-count">${mems.length} membre(s)</span>
+        <span class="grp-act">
+          <button class="btn small" data-admin-plan="${g.id}">📅 Planning</button>
+          <button class="mini danger" data-admin-del-brig="${g.id}">Supprimer</button>
+        </span>
+      </div>
+      <div class="brig-mems">${memList}</div>
+      <div class="brig-assign">
+        <select class="admin-assign-sel" data-brig="${g.id}">${addOpts}</select>
+        <button class="mini" data-admin-assign="${g.id}">Ajouter</button>
+      </div>
     </div>`;
   }).join("");
 }
@@ -1563,6 +1579,31 @@ function adminBindEvents(){
       await adminLoadAll();
     }catch(e){ alert("Erreur suppression : "+e.message); }
   }));
+
+  // Assigner un membre à une brigade
+  $$("[data-admin-assign]").forEach(btn=>{
+    btn.addEventListener("click",async()=>{
+      const gid=btn.dataset.adminAssign;
+      const sel=document.querySelector(`.admin-assign-sel[data-brig="${gid}"]`);
+      const uid=sel?sel.value:"";
+      if(!uid) return;
+      try{
+        await supa.rpc("admin_add_to_brigade",{target_uid:uid, p_group_id:gid});
+        await adminLoadAll();
+      }catch(e){ alert("Erreur : "+e.message); }
+    });
+  });
+
+  // Retirer un membre d'une brigade
+  $$(".brig-kick").forEach(btn=>{
+    btn.addEventListener("click",async()=>{
+      if(!confirm("Retirer ce membre de la brigade ?")) return;
+      try{
+        await supa.rpc("admin_remove_from_brigade",{target_uid:btn.dataset.uid, p_group_id:btn.dataset.gid});
+        await adminLoadAll();
+      }catch(e){ alert("Erreur : "+e.message); }
+    });
+  });
 
   // Créer une brigade (admin)
   const createBrig=async()=>{
@@ -1773,6 +1814,127 @@ async function renderManageOverlay(gid){
   $("#manageClose").addEventListener("click",()=>{ overlay.setAttribute("hidden",""); });
   $("#managePrev").addEventListener("click",async()=>{ manageMonth=new Date(manageMonth.getFullYear(),manageMonth.getMonth()-1,1); await renderManage(); });
   $("#manageNext").addEventListener("click",async()=>{ manageMonth=new Date(manageMonth.getFullYear(),manageMonth.getMonth()+1,1); await renderManage(); });
+}
+
+/* ===================== Feuille de cycle ===================== */
+async function renderCycleTab(){
+  const root=$("#cycleRoot"); if(!root) return;
+  if(!CLOUD||!cloudUser){
+    root.innerHTML=`<div class="card"><p class="muted">Connexion requise pour accéder à la feuille de cycle.</p></div>`;
+    return;
+  }
+  root.innerHTML=`<p class="empty" style="padding:48px;text-align:center">Chargement…</p>`;
+  try{
+    const {data}=await supa.from("group_members").select("group_id,groups(id,name,code)").eq("user_id",cloudUser.id);
+    cycleGroups=(data||[]).map(d=>d.groups).filter(Boolean);
+  }catch(e){ cycleGroups=[]; }
+  if(!cycleGroups.length){
+    root.innerHTML=`<div class="card"><p class="muted">Tu n'es dans aucune brigade. Rejoins-en une depuis l'onglet Équipe.</p></div>`;
+    return;
+  }
+  if(!cycleSelGid||!cycleGroups.find(g=>g.id===cycleSelGid)) cycleSelGid=cycleGroups[0].id;
+  if(!cycleStartDate){ cycleStartDate=new Date(); cycleStartDate.setHours(0,0,0,0); }
+  await renderCycle();
+}
+
+async function renderCycle(){
+  const root=$("#cycleRoot"); if(!root) return;
+  let brigMems=[], brigPlannings={};
+  try{
+    const {data}=await supa.from("group_members").select("user_id,display_name,crew").eq("group_id",cycleSelGid);
+    brigMems=(data||[]).sort((a,b)=>(a.display_name||"").localeCompare(b.display_name||""));
+  }catch(e){}
+  if(brigMems.length){
+    try{
+      const {data}=await supa.from("plannings").select("user_id,data").in("user_id",brigMems.map(m=>m.user_id));
+      (data||[]).forEach(p=>brigPlannings[p.user_id]=p.data||{});
+    }catch(e){}
+  }
+  const dates=[0,1,2].map(i=>{ const d=new Date(cycleStartDate); d.setDate(d.getDate()+i); return isoOf(d); });
+  try{
+    const {data}=await supa.from("cycle_notes").select("*").eq("group_id",cycleSelGid).in("date_iso",dates);
+    cycleNotes={}; (data||[]).forEach(n=>cycleNotes[n.date_iso]=n);
+  }catch(e){ cycleNotes={}; }
+
+  const g=cycleGroups.find(x=>x.id===cycleSelGid)||{name:"?"};
+  const editable=isChef();
+  const brigSelHtml=cycleGroups.length>1
+    ?`<select id="cycleBrigSel" class="crew-set">${cycleGroups.map(g2=>`<option value="${g2.id}"${g2.id===cycleSelGid?" selected":""}>${escapeHtml(g2.name)}</option>`).join("")}</select>`
+    :`<b>${escapeHtml(g.name)}</b>`;
+  const d0=new Date(cycleStartDate), dEnd=new Date(cycleStartDate); dEnd.setDate(dEnd.getDate()+2);
+  const cycleLabel=capit(d0.toLocaleDateString("fr-FR",{day:"numeric",month:"short"}))+" – "+capit(dEnd.toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"}));
+
+  let daysHtml="";
+  for(let i=0;i<3;i++){
+    const dt=new Date(cycleStartDate); dt.setDate(dt.getDate()+i);
+    const iso=isoOf(dt);
+    const note=cycleNotes[iso]||{};
+    const dayLabel=capit(dt.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"}));
+    const working={Alpha:[],Bravo:[],Charlie:[],none:[]};
+    const absent=[];
+    brigMems.forEach(mem=>{
+      const s=dayStatus(brigPlannings[mem.user_id]||{},iso);
+      if(!s.inRange) return;
+      if(s.leave) absent.push({mem,code:s.leave.code,color:leaveColor(s.leave.code,brigPlannings[mem.user_id]||{})});
+      else if(s.work){ const c=(working[mem.crew||"none"]?mem.crew:"none")||"none"; working[c].push(mem); }
+    });
+    const allWorking=[...working.Alpha,...working.Bravo,...working.Charlie,...working.none];
+    const chefOpts=`<option value="">— Chef de poste —</option>`+allWorking.map(m=>`<option value="${escapeHtml(m.display_name||"?")}"${note.chef_poste===(m.display_name||"")?" selected":""}>${escapeHtml(m.display_name||"?")}</option>`).join("");
+    const tvHtml=(lbl,mems)=>`<div class="fc-tv"><div class="fc-tv-hd">${lbl}</div><div class="fc-tv-body">${mems.length?mems.map(m=>`<span class="fc-name">${escapeHtml(m.display_name||"?")}</span>`).join(""):`<span class="fc-empty">—</span>`}</div></div>`;
+    let teamsHtml=`<div class="fc-teams">${tvHtml("TV Alpha",working.Alpha)}${tvHtml("TV Bravo",working.Bravo)}`;
+    if(working.Charlie.length) teamsHtml+=tvHtml("TV Charlie",working.Charlie);
+    if(working.none.length) teamsHtml+=tvHtml("En service",working.none);
+    teamsHtml+=`</div>`;
+    const absentHtml=absent.length?absent.map(a=>`<span class="fc-absent-item"><span class="fc-name">${escapeHtml(a.mem.display_name||"?")}</span><span class="fc-lbadge" style="background:${a.color}">${escapeHtml(a.code)}</span></span>`).join(""):`<span class="fc-empty">Aucun absent</span>`;
+    daysHtml+=`<div class="fc-day" data-fiso="${iso}">
+      <div class="fc-day-hd">
+        <span class="fc-day-label">${dayLabel}</span>
+        ${editable?`<select class="fc-chef-sel" data-fiso="${iso}">${chefOpts}</select>`:note.chef_poste?`<span class="fc-chef-badge">Chef : ${escapeHtml(note.chef_poste)}</span>`:""}
+      </div>
+      ${teamsHtml}
+      <div class="fc-section"><div class="fc-section-lbl">Absents</div><div class="fc-absent">${absentHtml}</div></div>
+      <div class="fc-section"><div class="fc-section-lbl">Sport / Notes</div>
+        ${editable?`<textarea class="fc-notes" data-fiso="${iso}" placeholder="Ex : Sport 19h-21h TVA au complet…" rows="2">${escapeHtml(note.notes||"")}</textarea>`
+          :note.notes?`<p class="fc-notes-ro">${escapeHtml(note.notes)}</p>`:`<p class="fc-empty">—</p>`}
+      </div>
+    </div>`;
+  }
+
+  root.innerHTML=`<div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      ${brigSelHtml}
+      <div class="month-nav">
+        <button class="btn small" id="cyclePrev">‹ 3j</button>
+        <span style="font-size:.8rem;font-weight:700;color:var(--muted)">${escapeHtml(cycleLabel)}</span>
+        <button class="btn small" id="cycleNext">3j ›</button>
+      </div>
+    </div>
+  </div>
+  <div id="fcDays">${daysHtml}</div>`;
+
+  $("#cycleBrigSel")?.addEventListener("change",e=>{ cycleSelGid=e.target.value; renderCycle(); });
+  $("#cyclePrev")?.addEventListener("click",()=>{ const d=new Date(cycleStartDate); d.setDate(d.getDate()-3); cycleStartDate=d; renderCycle(); });
+  $("#cycleNext")?.addEventListener("click",()=>{ const d=new Date(cycleStartDate); d.setDate(d.getDate()+3); cycleStartDate=d; renderCycle(); });
+  if(editable){
+    $$(".fc-chef-sel").forEach(sel=>sel.addEventListener("change",()=>{
+      const iso=sel.dataset.fiso;
+      saveCycleNote(iso,sel.value,document.querySelector(`.fc-notes[data-fiso="${iso}"]`)?.value||cycleNotes[iso]?.notes||"");
+    }));
+    $$(".fc-notes").forEach(ta=>{
+      let t; ta.addEventListener("input",()=>{ clearTimeout(t); t=setTimeout(()=>{
+        const iso=ta.dataset.fiso;
+        saveCycleNote(iso,document.querySelector(`.fc-chef-sel[data-fiso="${iso}"]`)?.value||cycleNotes[iso]?.chef_poste||"",ta.value);
+      },900); });
+    });
+  }
+}
+
+async function saveCycleNote(iso,chef,notes){
+  try{
+    await supa.rpc("save_cycle_note",{p_group_id:cycleSelGid,p_date_iso:iso,p_chef:chef,p_notes:notes});
+    if(!cycleNotes[iso]) cycleNotes[iso]={};
+    cycleNotes[iso].chef_poste=chef; cycleNotes[iso].notes=notes;
+  }catch(e){ console.warn("cycle_note:",e.message); }
 }
 
 /* ===================== Go ===================== */

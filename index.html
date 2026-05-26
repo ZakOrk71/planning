@@ -8,14 +8,15 @@
   <meta name="description" content="Planning des vacations police (3-3 / 2-2-3), congés, heures et équipe." />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Planning" />
   <link rel="manifest" href="manifest.json?v=10" />
   <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAIAAADdvvtQAAADDUlEQVR4nO3cMW7bQBBAUTpIkzM5V3PjXC1nctoUAgRBSQxbXwFnqfcqVQuC+7WGRI+enl/fNrjVl70vgLUJiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiL5uvcF3NPPl2+nF99//Nr3Si7NvKp7Oc4JdN6nq9f7mnlVd3ScgNiFgEgERCIgEgGRCIhEQCQCIhEQiYBIBERynIAuH1XOeWw586ru6On59W3va2BhxzmB2IWASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQyaDfBzrkr5/8P0P+QdYJRCIgEgGRCIhEQCQCIhEQiYBIBEQiIJJBjzI+7vJb/NsegExY4RjWO4GungHd8EhowgqHsVhAf92qT+3fhBWOZKWA3tmkD+7fhBUOZqWAGEhAJAIiWSmgdz4tf/CD9IQVDmalgLZ/bNKndm7CCkeyWEDbH1t1w85NWOEwlvwmum/YhBWOYb0TiFEERCIgEgGRCIhEQCQCIhEQiYBIBEQiIJIln4VNmKkwlXGy3gk0YabCVMbZYgFNmKkwlXFppYAmzFSYyriyUkAMJCASAZGsFNCEmQpTGVdWCmibMVNhKuPSYgFtM2YqTGWcLflN9ISZikeO5tJ6JxCjCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiGRQQI852XmbOfdqUECsaFZAc95Yk426S7MC2obdnYGm3Z9xAbGWiXNhpzeZwasr086ek7kn0Mz7tZexd2PiCXTmKNoGp3MyOqCT4Xfwwc39E8YSBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGR/AYL6LiFKhOywwAAAABJRU5ErkJggg==" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=16.4" />
+  <script>try{var _t=localStorage.getItem("planning_theme");if(_t)document.documentElement.setAttribute("data-theme",_t)}catch(e){}</script>
+  <link rel="stylesheet" href="css/style.css?v=16.5" />
 </head>
 <body>
 
@@ -96,6 +97,10 @@
       <div id="membersRoot"></div>
     </section>
 
+    <section class="panel" id="tab-feuille">
+      <div id="cycleRoot"></div>
+    </section>
+
     <section class="panel" id="tab-admin">
       <div id="adminRoot"></div>
     </section>
@@ -146,6 +151,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M5.5 16c.6-1.6 1.9-2.5 3-2.5s2.4.9 3 2.5M14 9h4M14 13h4"/></svg>
       <span>Membres</span>
     </button>
+    <button class="tab" data-tab="feuille">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      <span>Feuille</span>
+    </button>
     <button class="tab" data-tab="reglages">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.3-2.6h-4l-.3 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.3 2.6h4l.3-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/></svg>
       <span>Réglages</span>
@@ -173,8 +182,8 @@
     </div>
   </div>
 
-  <span class="vbadge">v16.4</span>
+  <span class="vbadge">v16.5</span>
   <script src="js/config.js?v=10"></script>
-  <script src="js/app.js?v=16.4"></script>
+  <script src="js/app.js?v=16.5"></script>
 </body>
 </html>

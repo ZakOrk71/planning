@@ -1,3 +1,5 @@
+html{background:var(--bg,#f4f5f9)}
+[data-theme="dark"] html,[data-theme="dark"]{background:#0d1117}
 :root{
   --bg:#f4f5f9;
   --surface:#ffffff;
@@ -68,7 +70,7 @@ body{font-family:"Plus Jakarta Sans",system-ui,-apple-system,sans-serif;backgrou
 .appbar-title h1{font-size:1.2rem;font-weight:800;letter-spacing:-.01em;line-height:1.1}
 .appbar-title p{color:var(--muted);font-size:.78rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .appbar-title strong{color:var(--ink);font-weight:700}
-.appbar-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.appbar-actions{display:flex;align-items:center;gap:10px;flex:0 0 auto}
 .icon-btn{width:40px;height:40px;flex:0 0 auto;display:grid;place-items:center;border:1px solid var(--line);
   background:var(--surface);color:var(--ink);border-radius:50%;cursor:pointer;box-shadow:var(--sh-sm);transition:.15s}
 .icon-btn:hover{border-color:var(--line2);color:var(--accent)}
@@ -381,9 +383,6 @@ input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;max-width:1
   background:var(--surface);color:var(--ink);font:inherit;cursor:pointer;transition:.13s}
 .admin-role-sel:focus{outline:none;border-color:var(--accent)}
 
-.admin-brigade-row{display:flex;align-items:center;gap:10px;padding:11px 13px;
-  background:var(--surface2);border:1px solid var(--line);border-radius:var(--r-sm);
-  flex-wrap:wrap;margin-bottom:8px}
 .admin-brigade-crew{color:var(--muted);font-size:.8rem;flex:1}
 .admin-brigade-count{font-size:.82rem;font-weight:600;color:var(--muted);flex:0 0 auto}
 
@@ -425,6 +424,49 @@ input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;max-width:1
 
 .vbadge{position:fixed;right:10px;bottom:calc(var(--nav-h) + var(--sb) + 6px);z-index:25;font-size:.6rem;font-weight:700;
   color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:2px 8px;opacity:.7}
+
+/* ---------- Feuille de cycle ---------- */
+.fc-day{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:14px;overflow:hidden;box-shadow:var(--sh)}
+.fc-day-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;
+  background:linear-gradient(120deg,#b45309 0%,#d97706 100%);flex-wrap:wrap}
+.fc-day-label{font-weight:800;font-size:.96rem;color:#fff;text-transform:capitalize;flex:1}
+.fc-chef-sel{padding:7px 10px;border-radius:10px;font-size:.82rem;border:1px solid rgba(255,255,255,.35);
+  background:rgba(255,255,255,.15);color:#fff;font:inherit;cursor:pointer;min-width:140px}
+.fc-chef-sel option{background:var(--surface);color:var(--ink)}
+.fc-chef-badge{font-size:.82rem;font-weight:700;color:rgba(255,255,255,.9);background:rgba(255,255,255,.15);
+  padding:5px 11px;border-radius:8px;white-space:nowrap}
+.fc-teams{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));border-bottom:1px solid var(--line)}
+.fc-tv{padding:12px 14px;border-right:1px solid var(--line)}
+.fc-tv:last-child{border-right:none}
+.fc-tv-hd{font-weight:800;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px}
+.fc-tv-body{display:flex;flex-direction:column;gap:5px}
+.fc-name{font-weight:600;font-size:.92rem;display:block}
+.fc-empty{color:var(--muted);font-style:italic;font-size:.85rem}
+.fc-section{padding:11px 14px;border-bottom:1px solid var(--line)}
+.fc-section:last-child{border-bottom:none}
+.fc-section-lbl{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:7px}
+.fc-absent{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.fc-absent-item{display:inline-flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--line);
+  padding:5px 9px;border-radius:8px}
+.fc-lbadge{font-weight:800;font-size:.65rem;color:#fff;padding:2px 6px;border-radius:5px;white-space:nowrap}
+.fc-notes{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:10px;color:var(--ink);
+  font:inherit;font-size:.9rem;padding:10px 12px;resize:vertical;min-height:54px;transition:.14s}
+.fc-notes:focus{outline:none;border-color:var(--accent);background:var(--surface)}
+.fc-notes-ro{font-size:.9rem;color:var(--ink);margin:0}
+
+/* ---------- Brigade member assignment (admin) ---------- */
+.brig-row-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;width:100%}
+.brig-mems{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.brig-mem-chip{display:inline-flex;align-items:center;gap:4px;background:var(--accent-soft);border:1px solid transparent;
+  color:var(--accent2);padding:3px 8px 3px 10px;border-radius:999px;font-size:.8rem;font-weight:600}
+.brig-kick{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.85rem;padding:0 2px;line-height:1;
+  font-weight:700;transition:.1s}
+.brig-kick:hover{color:var(--danger)}
+.brig-assign{display:flex;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);flex-wrap:wrap}
+.brig-assign select{flex:1;min-width:160px;padding:8px 10px;border-radius:10px;font:inherit;font-size:.85rem;
+  border:1px solid var(--line);background:var(--surface2);color:var(--ink)}
+.admin-brigade-row{display:flex;flex-direction:column;gap:0;padding:13px 15px;background:var(--surface2);
+  border:1px solid var(--line);border-radius:var(--r-sm);margin-bottom:10px}
 
 /* ---------- Heures par type ---------- */
 .hours-type-block{padding:12px 0;border-bottom:1px solid var(--line)}
@@ -480,23 +522,37 @@ input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;max-width:1
   .logo svg{width:19px;height:19px}
   .profile-chip{padding:4px 10px 4px 4px;font-size:.8rem}
   main{padding:12px 12px calc(var(--nav-h) + var(--sb) + 20px)}
-  .summary{grid-template-columns:repeat(2,1fr)}
+  .card{padding:14px;margin-bottom:12px}
+  .card-head{margin-bottom:10px}
+  .summary{grid-template-columns:repeat(2,1fr);gap:10px}
   .summary .s b{font-size:1.3rem}
   .days{grid-template-columns:repeat(auto-fill,minmax(92px,1fr))}
-  .card{padding:14px}
-  .card-head{margin-bottom:10px}
   .admin-mem-activity{display:none}
   .p4-cell{min-height:52px}
   .p4-n{font-size:.82rem}
   .p4-vtag{font-size:.5rem;padding:1px 4px}
   .p4-lcode{font-size:.55rem;padding:1px 4px;max-width:44px}
   .btn.block{padding:13px}
-  .bottomnav .tab{font-size:.6rem}
-  .bottomnav .tab svg{width:21px;height:21px}
+  .bottomnav .tab{font-size:.58rem}
+  .bottomnav .tab svg{width:20px;height:20px}
   .hours-type-row input{width:68px}
   .manage-topbar{padding:8px 12px}
   .manage-cards{padding:10px;gap:12px}
   .mgr-card-hd{padding:10px 12px}
+  /* Settings — Ajouter un type : stack vertically */
+  .add-type{flex-direction:column;align-items:stretch}
+  .add-type input:not([type=color]):not([type=checkbox]){width:100%}
+  .add-type #ntColor{height:46px;width:100%}
+  .add-type #addType{width:100%}
+  .add-type #ntMinutes{width:100%}
+  /* IO row */
+  .io-row .btn{flex:1 0 calc(50% - 5px)}
+  /* Brigade assign */
+  .brig-assign select{width:100%}
+  /* Feuille cycle */
+  .fc-day-hd{gap:8px}
+  .fc-chef-sel{min-width:0;flex:1}
+  .fc-day-label{font-size:.88rem}
 }
 @media(min-width:780px){
   .bottomnav .tab{flex-direction:row;gap:8px;font-size:.85rem}
