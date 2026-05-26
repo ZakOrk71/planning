@@ -670,11 +670,11 @@ function isChef(){ return !!(cloudProfile && (cloudProfile.role === "admin" || c
 function isDev(){ return !!(cloudProfile && cloudProfile.role === "dev"); }
 function roleBadgeHTML(role){
   const cfg = {
-    admin: { label:"ADMIN",  cls:"admin",  bg:"#ecebfd", color:"#4338ca" },
-    chef:  { label:"CHEF",   cls:"chef",   bg:"#dcfce7", color:"#15803d" },
-    dev:   { label:"DEV",    cls:"dev",    bg:"#fff3cd", color:"#92400e" },
-    user:  { label:"MEMBRE", cls:"membre", bg:"#e7eaf1", color:"#6b7488" },
-    membre:{ label:"MEMBRE", cls:"membre", bg:"#e7eaf1", color:"#6b7488" }
+    admin: { label:"ADMIN",  cls:"admin",  bg:"#4338ca", color:"#fff" },
+    chef:  { label:"CHEF",   cls:"chef",   bg:"#15803d", color:"#fff" },
+    dev:   { label:"DEV",    cls:"dev",    bg:"#b45309", color:"#fff" },
+    user:  { label:"MEMBRE", cls:"membre", bg:"#5b6478", color:"#fff" },
+    membre:{ label:"MEMBRE", cls:"membre", bg:"#5b6478", color:"#fff" }
   };
   const r = cfg[role] || cfg.user;
   return `<span class="role-badge ${r.cls}" style="background:${r.bg};color:${r.color}">${r.label}</span>`;
@@ -1047,7 +1047,7 @@ async function loadMembers(){
 
   if(admin){
     $$("#memList [data-role]").forEach(b=> b.addEventListener("click", async ()=>{
-      try{ await supa.rpc("set_role",{ target:b.dataset.id, new_role:b.dataset.role }); await loadMembers(); }
+      try{ await supa.rpc("admin_set_role",{ target:b.dataset.id, new_role:b.dataset.role }); await loadMembers(); }
       catch(e){ alert("Erreur : "+e.message); }
     }));
     $$("#memList [data-reset]").forEach(b=> b.addEventListener("click", async ()=>{
@@ -1380,23 +1380,18 @@ function adminBindEvents(){
     let newRole=sel.value;
     if(newRole==="membre") newRole="user";
     const isMe = sel.dataset.isme==="true";
-    if(isMe && (newRole==="user"||newRole==="membre")){
+    if(isMe && (newRole==="user")){
       if(!confirm("Tu vas retirer ton propre rôle admin. Tu perdras l'accès à ce panneau. Continuer ?")){ sel.value=sel.dataset.cur; return; }
     }
     sel.disabled = true;
     try{
-      // PATCH direct sur la table (supporte tous les rôles, dont chef et dev)
-      const { error } = await supa.from("profiles").update({ role: newRole }).eq("id", sel.dataset.uid);
+      const { error } = await supa.rpc("admin_set_role",{ target:sel.dataset.uid, new_role:newRole });
       if(error) throw error;
       if(isMe){ cloudProfile = cloudProfile||{}; cloudProfile.role=newRole; refreshChipCloud(); const at=$("#adminTab"); if(at) at.hidden=!isAdmin(); }
       await adminLoadAll();
     }catch(e){
-      // Fallback : essaie le RPC si le PATCH est bloqué par RLS
-      try{
-        await supa.rpc("set_role",{target:sel.dataset.uid, new_role:newRole});
-        if(isMe){ cloudProfile = cloudProfile||{}; cloudProfile.role=newRole; refreshChipCloud(); }
-        await adminLoadAll();
-      }catch(e2){ alert("Erreur changement de rôle : "+e2.message); sel.value=sel.dataset.cur; sel.disabled=false; }
+      alert("Erreur : "+e.message+"\n\nExecute ce SQL dans Supabase > SQL Editor :\n\nCREATE OR REPLACE FUNCTION admin_set_role(target uuid, new_role text)\nRETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$\nBEGIN\n  IF NOT EXISTS(SELECT 1 FROM profiles WHERE id=auth.uid() AND role='admin') THEN\n    RAISE EXCEPTION 'Permission refusee';\n  END IF;\n  UPDATE profiles SET role = CASE WHEN new_role='membre' THEN 'user' ELSE new_role END WHERE id=target;\nEND; $$;\nGRANT EXECUTE ON FUNCTION admin_set_role(uuid,text) TO authenticated;");
+      sel.value=sel.dataset.cur; sel.disabled=false;
     }
   }));
 
