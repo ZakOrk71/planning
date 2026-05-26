@@ -261,7 +261,7 @@ function traduireErreur(m){
 /* ===== Mode CLOUD : panneau compte (quand connecté) ===== */
 function accountPanelHTML(){
   const dn = displayName();
-  const roleBadge = isAdmin() ? `<span class="role-badge admin">ADMIN</span>` : `<span class="role-badge">Membre</span>`;
+  const roleBadge = roleBadgeHTML(cloudProfile ? cloudProfile.role : "user");
   return `
     <div class="gate-head">
       <div class="pavatar" style="width:42px;height:42px;font-size:1.1rem">${(dn[0]||"?").toUpperCase()}</div>
@@ -308,7 +308,7 @@ async function initCloud(){
 
   supa.auth.onAuthStateChange((_evt, sess)=>{
     if(sess && sess.user){ if(!cloudUser || cloudUser.id!==sess.user.id) onCloudLogin(sess.user); }
-    else { cloudUser=null; cloudProfile=null; stopPresence(); refreshChipCloud(); showGate(); }
+    else { cloudUser=null; cloudProfile=null; stopPresence(); refreshChipCloud(); const at=$("#adminTab"); if(at) at.hidden=true; showGate(); }
   });
 }
 async function onCloudLogin(user){
@@ -320,6 +320,7 @@ async function onCloudLogin(user){
     cloudProfile = prof || {};
   }catch(e){ cloudProfile = {}; }
   refreshChipCloud();
+  const adminTab = $("#adminTab"); if(adminTab) adminTab.hidden = !isAdmin();
   // cache local d'abord (affichage instantané + hors-ligne)
   let cached=null; try{ cached=JSON.parse(localStorage.getItem("cloud_cache::"+user.id)); }catch(e){}
   if(cached){ state=Object.assign(freshState(), cached); syncInputsFromState(); renderAll(); }
@@ -357,6 +358,7 @@ async function tryFetchJSON(path){
 
 /* ===================== Init ===================== */
 async function init(){
+  initTheme();
   // sécurité : la fenêtre "jour" doit être fermée au démarrage
   const mb = $("#modalBg"); mb.hidden = true; mb.style.display = "none";
   $("#partielWrap").hidden = true; $("#partielWrap").style.display = "none";
@@ -417,17 +419,21 @@ function bindProfileEvents(){
   });
   const rb = $("#refreshBtn");
   if(rb) rb.addEventListener("click", ()=> hardRefresh(rb));
+  const tb = $("#themeBtn");
+  if(tb) tb.addEventListener("click", toggleTheme);
 }
 
 async function hardRefresh(btn){
-  if(btn) btn.classList.add("spin");
-  // 1) on s'assure que les données en cours sont bien enregistrées dans le cloud
+  if(btn){ btn.classList.add("spin"); btn.disabled = true; }
+  const t0 = Date.now();
   try{
     if(CLOUD && cloudUser){
       await supa.from("plannings").upsert({ user_id:cloudUser.id, data:state, updated_at:new Date().toISOString() });
     }
   }catch(e){ /* on recharge quand même */ }
-  // 2) rechargement en contournant le cache (récupère la dernière version mise en ligne)
+  // Garantit 700ms d'animation visible avant le rechargement
+  const elapsed = Date.now() - t0;
+  if(elapsed < 700) await new Promise(r => setTimeout(r, 700 - elapsed));
   const base = location.origin + location.pathname;
   location.replace(base + "?r=" + Date.now());
 }
@@ -453,6 +459,7 @@ function bindEvents(){
     if(t.dataset.tab==="equipe") renderTeamTab();
     if(t.dataset.tab==="membres") renderMembersTab();
     if(t.dataset.tab==="reglages") renderTypes();
+    if(t.dataset.tab==="admin") renderAdminTab();
   }));
 
   $("#cadenceSelect").addEventListener("change", e=>{ state.cadence=e.target.value; updateCadenceNote(); });
@@ -659,6 +666,13 @@ function displayName(){
   return cloudUser ? cloudUser.email.split("@")[0] : "Moi";
 }
 function isAdmin(){ return !!(cloudProfile && cloudProfile.role === "admin"); }
+function isChef(){ return !!(cloudProfile && (cloudProfile.role === "admin" || cloudProfile.role === "chef")); }
+function isDev(){ return !!(cloudProfile && cloudProfile.role === "dev"); }
+function roleBadgeHTML(role){
+  const map = { admin:["ADMIN","admin"], chef:["CHEF","chef"], dev:["DEV","dev"], user:["MEMBRE","membre"], membre:["MEMBRE","membre"] };
+  const [label, cls] = map[role] || ["MEMBRE","membre"];
+  return `<span class="role-badge ${cls}">${label}</span>`;
+}
 function leaveColor(code, st){
   const arr = (st && st.types) || state.types || [];
   const t = arr.find(x=>x.code===code);
@@ -921,6 +935,29 @@ function startPresence(){
 }
 function stopPresence(){ clearInterval(presenceTimer); presenceTimer=null; }
 
+/* ===================== Thème clair / sombre ===================== */
+function initTheme(){
+  const saved = localStorage.getItem("planning_theme") || "light";
+  applyTheme(saved, false);
+}
+function applyTheme(theme, save=true){
+  document.documentElement.setAttribute("data-theme", theme);
+  if(save) localStorage.setItem("planning_theme", theme);
+  const btn = $("#themeBtn");
+  if(!btn) return;
+  if(theme === "dark"){
+    btn.title = "Passer en mode clair";
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>`;
+  } else {
+    btn.title = "Passer en mode sombre";
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>`;
+  }
+}
+function toggleTheme(){
+  const cur = document.documentElement.getAttribute("data-theme") || "light";
+  applyTheme(cur === "dark" ? "light" : "dark");
+}
+
 function timeAgo(iso){
   if(!iso) return "jamais";
   const s = Math.floor((Date.now() - new Date(iso).getTime())/1000);
@@ -949,7 +986,10 @@ async function renderMembersTab(){
     return;
   }
   root.innerHTML = `<div class="stats" id="memStats"></div>
-    <div class="card"><div class="mem-head"><h2>Liste des inscrits</h2><button class="btn small" id="memRefresh">Rafraîchir</button></div>
+    <div class="card"><div class="mem-head"><h2>Liste des inscrits</h2>
+    <button class="btn small" id="memRefresh">
+      <svg class="mem-refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>Rafraîchir
+    </button></div>
     <div id="memList" class="posed-list"><p class="empty">Chargement…</p></div></div>`;
   $("#memRefresh").addEventListener("click", loadMembers);
   await pingPresence();
@@ -957,6 +997,8 @@ async function renderMembersTab(){
 }
 
 async function loadMembers(){
+  const btn = $("#memRefresh");
+  if(btn){ btn.disabled = true; btn.classList.add("mem-refresh-loading"); }
   let rows = [];
   try{
     const { data, error } = await supa.from("profiles").select("id,email,display_name,role,created_at,last_seen").order("last_seen",{ascending:false});
@@ -964,15 +1006,18 @@ async function loadMembers(){
     rows = data || [];
   }catch(e){
     $("#memList").innerHTML = `<p class="empty">Impossible de lire la liste (as-tu exécuté <b>database.sql</b> ?). ${escapeHtml(e.message)}</p>`;
+    if(btn){ btn.disabled = false; btn.classList.remove("mem-refresh-loading"); }
     return;
   }
   const online = rows.filter(r=>onlineState(r.last_seen)==="on").length;
   const admins = rows.filter(r=>r.role==="admin").length;
+  const chefs = rows.filter(r=>r.role==="chef").length;
   $("#memStats").innerHTML = `
     <div class="stat"><b>${rows.length}</b><span>inscrits</span></div>
-    <div class="stat good"><b>${online}</b><span>en ligne maintenant</span></div>
-    <div class="stat"><b>${admins}</b><span>admin(s)</span></div>`;
-  if(!rows.length){ $("#memList").innerHTML = `<p class="empty">Aucun inscrit pour le moment.</p>`; return; }
+    <div class="stat good"><b>${online}</b><span>en ligne</span></div>
+    <div class="stat"><b>${admins}</b><span>admin(s)</span></div>
+    <div class="stat"><b>${chefs}</b><span>chef(s) d'équipe</span></div>`;
+  if(!rows.length){ $("#memList").innerHTML = `<p class="empty">Aucun inscrit pour le moment.</p>`; if(btn){ btn.disabled=false; btn.classList.remove("mem-refresh-loading"); } return; }
 
   const admin = isAdmin();
   $("#memList").innerHTML = rows.map(r=>{
@@ -980,13 +1025,13 @@ async function loadMembers(){
     const isMe = r.id===cloudUser.id;
     const dn = r.display_name || (r.email||"—").split("@")[0];
     const label = st==="on" ? "en ligne" : timeAgo(r.last_seen);
-    const badge = r.role==="admin" ? `<span class="role-badge admin">ADMIN</span>` : "";
+    const badge = roleBadgeHTML(r.role);
     let actions = "";
-    if(admin){
+    if(admin && !isMe){
       const toggle = r.role==="admin"
         ? `<button class="mini" data-role="user" data-id="${r.id}">retirer admin</button>`
-        : `<button class="mini" data-role="admin" data-id="${r.id}">promouvoir admin</button>`;
-      actions = `<span class="mem-actions">${toggle}<button class="mini danger" data-reset="${r.id}">réinit. planning</button></span>`;
+        : `<button class="mini" data-role="admin" data-id="${r.id}">→ admin</button>`;
+      actions = `<span class="mem-actions">${toggle}<button class="mini danger" data-reset="${r.id}">réinit.</button></span>`;
     }
     return `<div class="posed-row mem-row">
       <span class="mem-id"><span class="online ${st}"></span><b>${escapeHtml(dn)}</b>${badge}${isMe?' <em>(moi)</em>':''}<small class="mem-email">${escapeHtml(r.email||"")}</small></span>
@@ -1005,6 +1050,7 @@ async function loadMembers(){
       catch(e){ alert("Erreur : "+e.message); }
     }));
   }
+  if(btn){ btn.disabled = false; btn.classList.remove("mem-refresh-loading"); }
 }
 
 function renderHours(){
@@ -1116,6 +1162,272 @@ function importJSON(e){
   };
   reader.readAsText(f);
   e.target.value = "";
+}
+
+/* ===================== PANNEAU ADMIN ===================== */
+let adminAllMembers = [], adminAllBrigades = [], adminBrigadeMembers = [];
+let adminSearchQuery = "", adminSelBrigade = null, adminPlanMonth = new Date();
+
+async function renderAdminTab(){
+  const root = $("#adminRoot");
+  if(!CLOUD){ root.innerHTML = `<div class="card"><h2>Administration</h2><p class="muted">Mode comptes (Supabase) requis.</p></div>`; return; }
+  if(!cloudUser || !isAdmin()){ root.innerHTML = `<div class="card"><h2>Accès refusé</h2><p class="muted">Réservé aux administrateurs.</p></div>`; return; }
+  root.innerHTML = `<p class="empty" style="padding:24px;text-align:center">Chargement du panneau admin…</p>`;
+  await adminLoadAll();
+}
+
+async function adminLoadAll(){
+  try{
+    const [r1,r2,r3] = await Promise.all([
+      supa.from("profiles").select("id,email,display_name,role,created_at,last_seen").order("display_name",{ascending:true}),
+      supa.from("groups").select("id,name,code"),
+      supa.from("group_members").select("user_id,display_name,crew,group_id")
+    ]);
+    adminAllMembers = r1.data||[];
+    adminAllBrigades = r2.data||[];
+    adminBrigadeMembers = r3.data||[];
+  }catch(e){ console.warn("Admin load:",e.message); adminAllMembers=[]; adminAllBrigades=[]; adminBrigadeMembers=[]; }
+  adminRenderFull();
+}
+
+function adminRenderFull(){
+  const root = $("#adminRoot");
+  if(!root) return;
+  const online = adminAllMembers.filter(r=>onlineState(r.last_seen)==="on").length;
+  const admins = adminAllMembers.filter(r=>r.role==="admin").length;
+  const chefs  = adminAllMembers.filter(r=>r.role==="chef").length;
+
+  root.innerHTML = `
+    <!-- Dashboard -->
+    <div class="stats">
+      <div class="stat"><b>${adminAllMembers.length}</b><span>inscrits</span></div>
+      <div class="stat good"><b>${online}</b><span>en ligne</span></div>
+      <div class="stat"><b>${adminAllBrigades.length}</b><span>brigades</span></div>
+      <div class="stat"><b>${admins}A · ${chefs}C</b><span>admins · chefs</span></div>
+    </div>
+
+    <!-- Gestion des membres -->
+    <div class="card">
+      <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <h2>👥 Gestion des membres</h2>
+        <button class="btn small" id="adminRefreshBtn">
+          <svg id="adminRefreshIcon" class="mem-refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>Rafraîchir
+        </button>
+      </div>
+      <div class="admin-search-wrap">
+        <input type="text" id="adminSearch" placeholder="Rechercher par nom ou email…" value="${escapeHtml(adminSearchQuery)}" />
+      </div>
+      <div id="adminMemberList"></div>
+    </div>
+
+    <!-- Gestion des brigades -->
+    <div class="card">
+      <div class="card-head"><h2>🚔 Gestion des brigades</h2></div>
+      <div id="adminBrigadeList"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <input id="adminNewBrig" placeholder="Nom de la brigade à créer…" maxlength="30" style="flex:1;min-width:180px" />
+        <button class="btn primary" id="adminCreateBrig">Créer</button>
+      </div>
+    </div>
+
+    <!-- Vue planning par brigade -->
+    <div class="card" id="adminPlanCard" ${adminSelBrigade?"":"style=\"display:none\""}>
+      <div class="admin-plan-header card-head">
+        <h2>📅 Planning — <span id="adminPlanName">${adminSelBrigade?escapeHtml(adminSelBrigade.name):""}</span></h2>
+        <div class="month-nav">
+          <button class="btn small" id="adminPlanPrev">‹</button>
+          <span id="adminPlanMonthLbl"></span>
+          <button class="btn small" id="adminPlanNext">›</button>
+        </div>
+      </div>
+      <div id="adminPlanContent"></div>
+    </div>`;
+
+  adminRenderMemberList();
+  adminRenderBrigadeList();
+  if(adminSelBrigade) adminRenderPlanning();
+  adminBindEvents();
+}
+
+function adminGetFilteredMembers(){
+  const q = adminSearchQuery.toLowerCase();
+  return q ? adminAllMembers.filter(r=>(r.display_name||"").toLowerCase().includes(q)||(r.email||"").toLowerCase().includes(q)) : adminAllMembers;
+}
+
+function adminRenderMemberList(){
+  const c = $("#adminMemberList"); if(!c) return;
+  const list = adminGetFilteredMembers();
+  if(!list.length){ c.innerHTML=`<p class="empty">Aucun membre trouvé.</p>`; return; }
+  const roles = ["membre","chef","admin","dev"];
+  c.innerHTML = `<div class="admin-mem-table">` + list.map(r=>{
+    const st = onlineState(r.last_seen);
+    const isMe = r.id===cloudUser.id;
+    const dn = r.display_name||(r.email||"—").split("@")[0];
+    const brigs = adminBrigadeMembers.filter(bm=>bm.user_id===r.id).map(bm=>{
+      const g=adminAllBrigades.find(x=>x.id===bm.group_id);
+      return g ? escapeHtml(g.name)+(bm.crew?` (${bm.crew})`:"") : null;
+    }).filter(Boolean).join(", ")||"—";
+    const curRole = r.role==="user"||!r.role ? "membre" : r.role;
+    const opts = roles.map(rl=>`<option value="${rl}"${curRole===rl?" selected":""}>${rl==="chef"?"chef d'équipe":rl}</option>`).join("");
+    return `<div class="admin-mem-row${isMe?" me":""}">
+      <span class="admin-mem-id">
+        <span class="online ${st}" title="${st==="on"?"en ligne":timeAgo(r.last_seen)}"></span>
+        <span><b>${escapeHtml(dn)}</b>${isMe?` <em>(moi)</em>`:""}${roleBadgeHTML(r.role)}<small class="mem-email">${escapeHtml(r.email||"")}</small></span>
+      </span>
+      <span class="admin-mem-brigade" title="${escapeHtml(brigs)}">${brigs}</span>
+      <span class="admin-mem-activity">${st==="on"?"en ligne":timeAgo(r.last_seen)}</span>
+      <span class="admin-mem-actions">
+        <select class="admin-role-sel" data-uid="${r.id}" data-cur="${r.role||"user"}"${isMe?" disabled":""} title="Changer le rôle">${opts}</select>
+        ${isMe?"" : `<button class="mini danger" data-reset-plan="${r.id}" title="Réinitialiser le planning">Réinit.</button>`}
+      </span>
+    </div>`;
+  }).join("") + `</div>`;
+}
+
+function adminRenderBrigadeList(){
+  const c = $("#adminBrigadeList"); if(!c) return;
+  if(!adminAllBrigades.length){ c.innerHTML=`<p class="empty">Aucune brigade créée pour le moment.</p>`; return; }
+  c.innerHTML = adminAllBrigades.map(g=>{
+    const mems = adminBrigadeMembers.filter(bm=>bm.group_id===g.id);
+    const crews = {Alpha:0,Bravo:0,Charlie:0};
+    mems.forEach(m=>{ if(m.crew&&crews[m.crew]!==undefined) crews[m.crew]++; });
+    const crewStr = Object.entries(crews).filter(([,n])=>n>0).map(([c,n])=>`${c[0]}:${n}`).join(" ") || "—";
+    return `<div class="admin-brigade-row">
+      <span class="grp-name">${escapeHtml(g.name)}</span>
+      <span class="grp-code">code <b>${g.code}</b></span>
+      <span class="admin-brigade-crew">${crewStr}</span>
+      <span class="admin-brigade-count">${mems.length} membre(s)</span>
+      <span class="grp-act">
+        <button class="btn small" data-admin-plan="${g.id}">Voir planning</button>
+        <button class="mini danger" data-admin-del-brig="${g.id}">Supprimer</button>
+      </span>
+    </div>`;
+  }).join("");
+}
+
+async function adminRenderPlanning(){
+  const card=$("#adminPlanCard"), content=$("#adminPlanContent");
+  if(!card||!content||!adminSelBrigade) return;
+  card.style.display="";
+  if($("#adminPlanName")) $("#adminPlanName").textContent = adminSelBrigade.name;
+  const y=adminPlanMonth.getFullYear(), m=adminPlanMonth.getMonth();
+  const lbl = capit(adminPlanMonth.toLocaleDateString("fr-FR",{month:"long",year:"numeric"}));
+  if($("#adminPlanMonthLbl")) $("#adminPlanMonthLbl").textContent = lbl;
+  content.innerHTML=`<p class="empty">Chargement…</p>`;
+  const brigMems = adminBrigadeMembers.filter(bm=>bm.group_id===adminSelBrigade.id);
+  let plannings={};
+  if(brigMems.length){
+    try{
+      const {data}=await supa.from("plannings").select("user_id,data").in("user_id",brigMems.map(m=>m.user_id));
+      (data||[]).forEach(p=>plannings[p.user_id]=p.data||{});
+    }catch(e){ console.warn(e.message); }
+  }
+  const nDays=new Date(y,m+1,0).getDate();
+  const todayISO=isoOf(new Date());
+  let head=`<th class="mname">Membre</th>`;
+  for(let d=1;d<=nDays;d++){
+    const dt=new Date(y,m,d);
+    const we=(dt.getDay()===0||dt.getDay()===6)?" we":"";
+    head+=`<th class="dcol${we}"><span>${d}</span><small>${dt.toLocaleDateString("fr-FR",{weekday:"narrow"})}</small></th>`;
+  }
+  brigMems.sort((a,b)=>(a.display_name||"").localeCompare(b.display_name||""));
+  const rows = brigMems.map(mem=>{
+    const st=plannings[mem.user_id]||{};
+    const isMe=mem.user_id===cloudUser.id;
+    const crewCls=mem.crew?`crew-${mem.crew.toLowerCase()}`:"";
+    const crewBadge=mem.crew?`<span class="crew-badge-sm ${crewCls}">${mem.crew[0]}</span>`:"";
+    let cells="";
+    for(let d=1;d<=nDays;d++){
+      const iso=isoOf(new Date(y,m,d));
+      const s=dayStatus(st,iso);
+      const today=iso===todayISO?" today":"";
+      if(!s.inRange) cells+=`<td class="cell out${today}"></td>`;
+      else if(s.leave) cells+=`<td class="cell lv${today}" style="background:${leaveColor(s.leave.code,st)}" title="${escapeHtml(s.leave.code)}">${escapeHtml(s.leave.code[0])}</td>`;
+      else if(s.work) cells+=`<td class="cell work${today}" title="Vacation"></td>`;
+      else cells+=`<td class="cell rest${today}"></td>`;
+    }
+    return `<tr><td class="mname${isMe?" me":""}">${escapeHtml(mem.display_name||"?")}${crewBadge}</td>${cells}</tr>`;
+  }).join("");
+  if(!brigMems.length){ content.innerHTML=`<p class="empty">Cette brigade n'a pas de membres.</p>`; return; }
+  content.innerHTML=`
+    <div class="team-scroll"><table class="team-grid"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="legend" style="margin-top:12px">
+      <span class="lg"><span class="dot" style="background:#f0a23c"></span>Vacation</span>
+      <span class="lg"><span class="dot" style="background:var(--surface2)"></span>Repos</span>
+      <span class="lg"><span class="dot" style="background:var(--accent)"></span>Congé</span>
+    </div>`;
+}
+
+function adminBindEvents(){
+  const search=$("#adminSearch");
+  if(search) search.addEventListener("input",e=>{ adminSearchQuery=e.target.value; adminRenderMemberList(); });
+
+  const rfBtn=$("#adminRefreshBtn");
+  if(rfBtn) rfBtn.addEventListener("click",async()=>{
+    rfBtn.disabled=true; rfBtn.classList.add("mem-refresh-loading");
+    await adminLoadAll();
+    rfBtn.disabled=false; rfBtn.classList.remove("mem-refresh-loading");
+  });
+
+  // Changement de rôle
+  $$(".admin-role-sel").forEach(sel=>sel.addEventListener("change",async()=>{
+    let newRole=sel.value;
+    if(newRole==="membre") newRole="user";
+    try{
+      await supa.rpc("set_role",{target:sel.dataset.uid, new_role:newRole});
+      await adminLoadAll();
+    }catch(e){ alert("Erreur rôle : "+e.message); sel.value=sel.dataset.cur; }
+  }));
+
+  // Réinit planning
+  $$("[data-reset-plan]").forEach(b=>b.addEventListener("click",async()=>{
+    if(!confirm("Réinitialiser le planning de ce membre ?")) return;
+    try{ await supa.rpc("admin_reset_planning",{target:b.dataset.resetPlan}); alert("Planning réinitialisé."); }
+    catch(e){ alert("Erreur : "+e.message); }
+  }));
+
+  // Ouvrir planning brigade
+  $$("[data-admin-plan]").forEach(b=>b.addEventListener("click",async()=>{
+    adminSelBrigade=adminAllBrigades.find(g=>g.id===b.dataset.adminPlan);
+    adminPlanMonth=new Date();
+    const card=$("#adminPlanCard"); if(card) card.style.display="";
+    await adminRenderPlanning();
+    adminBindPlanNav();
+  }));
+
+  // Supprimer brigade
+  $$("[data-admin-del-brig]").forEach(b=>b.addEventListener("click",async()=>{
+    const gid=b.dataset.adminDelBrig;
+    const g=adminAllBrigades.find(x=>x.id===gid);
+    if(!confirm(`Supprimer la brigade « ${g?g.name:gid} » et retirer tous ses membres ?`)) return;
+    try{
+      await supa.from("group_members").delete().eq("group_id",gid);
+      await supa.from("groups").delete().eq("id",gid);
+      if(adminSelBrigade&&adminSelBrigade.id===gid){ adminSelBrigade=null; const card=$("#adminPlanCard"); if(card) card.style.display="none"; }
+      await adminLoadAll();
+    }catch(e){ alert("Erreur suppression : "+e.message); }
+  }));
+
+  // Créer une brigade (admin)
+  const createBrig=async()=>{
+    const name=($("#adminNewBrig")||{}).value&&$("#adminNewBrig").value.trim();
+    if(!name) return alert("Donne un nom.");
+    try{
+      await supa.rpc("create_group",{group_name:name, display:displayName()});
+      if($("#adminNewBrig")) $("#adminNewBrig").value="";
+      await adminLoadAll();
+    }catch(e){ alert("Erreur création : "+e.message); }
+  };
+  const cBtn=$("#adminCreateBrig");
+  if(cBtn) cBtn.addEventListener("click",createBrig);
+
+  adminBindPlanNav();
+}
+
+function adminBindPlanNav(){
+  const prev=$("#adminPlanPrev"), next=$("#adminPlanNext");
+  if(prev) prev.onclick=async()=>{ adminPlanMonth=new Date(adminPlanMonth.getFullYear(),adminPlanMonth.getMonth()-1,1); await adminRenderPlanning(); adminBindPlanNav(); };
+  if(next) next.onclick=async()=>{ adminPlanMonth=new Date(adminPlanMonth.getFullYear(),adminPlanMonth.getMonth()+1,1); await adminRenderPlanning(); adminBindPlanNav(); };
 }
 
 /* ===================== Go ===================== */

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
@@ -32,6 +32,9 @@
     <div class="appbar-actions">
       <button class="icon-btn" id="refreshBtn" title="Rafraîchir (récupère la dernière version + les données)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>
+      </button>
+      <button class="icon-btn" id="themeBtn" title="Passer en mode sombre">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
       </button>
       <button class="profile-chip" id="profileChip" title="Mon compte">
         <span class="pavatar" id="pAvatar">?</span>
@@ -97,6 +100,10 @@
       <div id="membersRoot"></div>
     </section>
 
+    <section class="panel" id="tab-admin">
+      <div id="adminRoot"></div>
+    </section>
+
     <section class="panel" id="tab-reglages">
       <div class="card">
         <div class="card-head"><h2>Types de congés / absences</h2></div>
@@ -146,6 +153,10 @@
     <button class="tab" data-tab="reglages">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.3-2.6h-4l-.3 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.3 2.6h4l.3-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/></svg>
       <span>Réglages</span>
+    </button>
+    <button class="tab" data-tab="admin" id="adminTab" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>Admin</span>
     </button>
   </nav>
 
