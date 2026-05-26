@@ -1602,18 +1602,22 @@ async function renderManageOverlay(gid){
   overlay.removeAttribute("hidden");
   overlay.innerHTML = `<div class="manage-inner">
     <div class="manage-topbar">
-      <button class="btn small" id="manageClose">✕ Fermer</button>
-      <div class="manage-title">
-        <h2>${escapeHtml(g.name)}</h2>
-        <span class="muted">code <b>${g.code}</b> · Gestion des plannings</span>
+      <div class="manage-topbar-row">
+        <button class="btn small" id="manageClose">← Retour</button>
+        <div class="manage-title">
+          <h2>${escapeHtml(g.name)}</h2>
+          <small>code <b>${g.code}</b></small>
+        </div>
       </div>
-      <div class="month-nav">
-        <button class="btn small" id="managePrev">‹</button>
-        <span id="manageMonthLbl"></span>
-        <button class="btn small" id="manageNext">›</button>
+      <div class="manage-topbar-row" style="justify-content:center">
+        <div class="month-nav">
+          <button class="btn small" id="managePrev">‹</button>
+          <span id="manageMonthLbl"></span>
+          <button class="btn small" id="manageNext">›</button>
+        </div>
       </div>
     </div>
-    <div class="manage-body" id="manageBody"><p class="empty" style="padding:32px;text-align:center">Chargement…</p></div>
+    <div class="manage-body" id="manageBody"><p class="empty" style="padding:48px;text-align:center">Chargement…</p></div>
   </div>`;
 
   let manageMonth = new Date();
@@ -1633,75 +1637,94 @@ async function renderManageOverlay(gid){
     }
   };
 
+  const WEEK_LBL = ["L","M","M","J","V","S","D"];
+
   const renderManage = async ()=>{
     const body=$("#manageBody");
     if(!body) return;
-    body.innerHTML=`<p class="empty" style="padding:32px;text-align:center">Chargement…</p>`;
+    body.innerHTML=`<p class="empty" style="padding:48px;text-align:center">Chargement…</p>`;
     await fetchData();
-    const y=manageMonth.getFullYear(), m=manageMonth.getMonth();
-    const nDays=new Date(y,m+1,0).getDate();
+    const y=manageMonth.getFullYear(), mo=manageMonth.getMonth();
+    const nDays=new Date(y,mo+1,0).getDate();
     const todayISO=isoOf(new Date());
     const monthName=capit(manageMonth.toLocaleDateString("fr-FR",{month:"long",year:"numeric"}));
     if($("#manageMonthLbl")) $("#manageMonthLbl").textContent=monthName;
-
-    // En-tête jours
-    let headCells=`<div class="mgr-name-col mgr-head-cell">Membre</div>`;
-    for(let d=1;d<=nDays;d++){
-      const dt=new Date(y,m,d), isWE=dt.getDay()===0||dt.getDay()===6;
-      headCells+=`<div class="mgr-day-hd${isWE?" we":""}">${d}<br><small>${dt.toLocaleDateString("fr-FR",{weekday:"narrow"})}</small></div>`;
+    if(!brigMems.length){
+      body.innerHTML=`<p class="empty" style="padding:48px;text-align:center">Aucun membre dans cette brigade.</p>`;
+      return;
     }
-    headCells+=`<div class="mgr-crew-col mgr-head-cell">Équipage</div>`;
+    // First day of month → Monday-based offset (0=Mon … 6=Sun)
+    const firstDOW=(new Date(y,mo,1).getDay()+6)%7;
+    // Week header HTML (shared)
+    const whdHtml=WEEK_LBL.map((l,i)=>`<span class="${i>=5?"we-h":""}">${l}</span>`).join("");
 
-    // Lignes membres
-    let rowsHtml="";
+    let cardsHtml="";
     brigMems.forEach(mem=>{
       const st=brigPlannings[mem.user_id]||{};
       const isMe=mem.user_id===cloudUser.id;
       const dn=escapeHtml(mem.display_name||"?");
-      let cells=`<div class="mgr-name-col">
-        <span class="mgr-name">${dn}${isMe?` <em>(moi)</em>`:""}</span>
-        ${!isMe?`<button class="mini mgr-rename-btn" data-ruid="${mem.user_id}" title="Renommer">✎</button>`:""}
-      </div>`;
+      const initials=(mem.display_name||"?").split(" ").filter(Boolean).map(w=>w[0]).join("").toUpperCase().substring(0,2)||"?";
+      const crewOpts=["","Alpha","Bravo","Charlie"].map(c=>`<option value="${c}"${mem.crew===c?" selected":""}>${c||"— équipage"}</option>`).join("");
+      const canRen=isAdmin()&&!isMe;
+
+      // Cells : padding + days
+      let cellsHtml="";
+      for(let p=0;p<firstDOW;p++) cellsHtml+=`<div class="p4-cell empty"></div>`;
       for(let d=1;d<=nDays;d++){
-        const iso=isoOf(new Date(y,m,d));
+        const dt=new Date(y,mo,d), iso=isoOf(dt);
         const s=dayStatus(st,iso);
-        const isToday=iso===todayISO;
-        const dt=new Date(y,m,d), isWE=dt.getDay()===0||dt.getDay()===6;
+        const isToday=iso===todayISO, isWE=dt.getDay()===0||dt.getDay()===6;
         const editable=!isMe&&s.inRange;
-        let cls="mgr-cell"+(isToday?" today":"")+(isWE&&!s.work?" we":"");
-        let style="", cnt="";
-        if(!s.inRange){cls+=" out";}
-        else if(s.leave){const col=leaveColor(s.leave.code,st);style=`background:${col};color:#fff`;cnt=s.leave.code.substring(0,2);cls+=" lv";}
-        else if(s.work){cls+=" work";cnt="V";}
-        else{cls+=" rest";}
+        let cls="p4-cell"+(isToday?" now":"");
+        let style="", inner="";
+        if(!s.inRange){
+          cls+=" empty";
+          inner=`<span class="p4-n" style="opacity:.25">${d}</span>`;
+        } else if(s.leave){
+          const col=leaveColor(s.leave.code,st);
+          style=`background:${col}`;
+          cls+=" lv";
+          inner=`<span class="p4-n" style="color:#fff">${d}</span><span class="p4-lcode" style="background:rgba(0,0,0,.22)">${escapeHtml(s.leave.code.substring(0,4))}</span>`;
+        } else if(s.work){
+          cls+=isWE?" work we":" work";
+          inner=`<span class="p4-n">${d}</span><span class="p4-vtag">V</span>`;
+        } else {
+          cls+=isWE?" we":" rest";
+          inner=`<span class="p4-n">${d}</span>`;
+        }
         const ea=editable?` data-meuid="${mem.user_id}" data-meiso="${iso}"`:"";
-        cells+=`<div class="${cls}" style="${style}"${ea}>${cnt}</div>`;
+        cellsHtml+=`<div class="${cls}" style="${style}"${ea}>${inner}</div>`;
       }
-      const crewOpts=["","Alpha","Bravo","Charlie"].map(c=>`<option value="${c}"${mem.crew===c?" selected":""}>${c||"—"}</option>`).join("");
-      cells+=`<div class="mgr-crew-col"><select class="mgr-crew-sel" data-muid="${mem.user_id}">${crewOpts}</select></div>`;
-      rowsHtml+=`<div class="mgr-row" data-uid="${mem.user_id}">${cells}</div>`;
+
+      cardsHtml+=`<div class="mgr-card" data-uid="${mem.user_id}">
+        <div class="mgr-card-hd">
+          <div class="mgr-avatar">${escapeHtml(initials)}</div>
+          <div class="mgr-card-info">
+            <span class="mgr-card-dn">${dn}${isMe?` <em>(moi)</em>`:""}</span>
+          </div>
+          <div class="mgr-crew-wrap"><select class="mgr-crew-sel" data-muid="${mem.user_id}">${crewOpts}</select></div>
+          ${canRen?`<button class="mgr-card-rename" data-ruid="${mem.user_id}" title="Renommer">✎</button>`:""}
+        </div>
+        <div class="p4-whd">${whdHtml}</div>
+        <div class="p4-grid mgr-p4-grid">${cellsHtml}</div>
+      </div>`;
     });
 
-    body.innerHTML=`<div class="manage-grid-wrap"><div class="manage-grid">
-      <div class="mgr-row mgr-head">${headCells}</div>
-      ${rowsHtml||`<p class="empty" style="padding:24px">Aucun membre.</p>`}
-    </div></div>
-    <div style="padding:16px">
-      <div class="legend">
-        <span class="lg"><span class="dot" style="background:#fff7ed;border:1px solid #f59e0b"></span>Vacation (V)</span>
+    body.innerHTML=`<div class="manage-cards">${cardsHtml}
+      <div class="legend" style="padding-bottom:4px">
+        <span class="lg"><span class="dot" style="background:#fff7ed;border:1px solid #f59e0b"></span>Vacation</span>
         <span class="lg"><span class="dot" style="background:var(--surface2)"></span>Repos</span>
-        <span class="lg"><span class="dot" style="background:#4f46e5"></span>Congé posé</span>
-        ${isChef()?`<span class="lg" style="color:var(--accent)">✎ Cliquer une cellule pour modifier</span>`:""}
+        <span class="lg"><span class="dot" style="background:#4f46e5"></span>Congé</span>
+        ${isChef()?`<span class="lg" style="color:var(--accent)">Toucher une case pour modifier</span>`:""}
       </div>
     </div>`;
 
-    // Events : cellules
-    $$(".mgr-cell[data-meuid]").forEach(cell=>{
+    // Events : cells
+    $$(".mgr-p4-grid .p4-cell[data-meuid]").forEach(cell=>{
       cell.addEventListener("click",()=>{
         const uid=cell.dataset.meuid, iso=cell.dataset.meiso;
         const mem=brigMems.find(m=>m.user_id===uid);
-        const mSt=brigPlannings[uid]||{};
-        openTeamLeaveModal(uid, mem?(mem.display_name||"?"):"?", iso, mSt, renderManage);
+        openTeamLeaveModal(uid, mem?(mem.display_name||"?"):"?", iso, brigPlannings[uid]||{}, renderManage);
       });
     });
 
@@ -1716,31 +1739,32 @@ async function renderManageOverlay(gid){
       });
     });
 
-    // Events : renommer
-    $$(".mgr-rename-btn").forEach(btn=>{
+    // Events : renommer (admin/dev)
+    $$(".mgr-card-rename").forEach(btn=>{
       btn.addEventListener("click",()=>{
         const uid=btn.dataset.ruid;
         const mem=brigMems.find(m=>m.user_id===uid);
-        const row=btn.closest(".mgr-row");
-        const nameEl=row?row.querySelector(".mgr-name"):null;
-        if(!nameEl) return;
+        const card=btn.closest(".mgr-card");
+        const dnEl=card?card.querySelector(".mgr-card-dn"):null;
+        if(!dnEl) return;
         const cur=(mem&&mem.display_name)||"";
         const inp=document.createElement("input");
-        inp.value=cur; inp.className="mgr-rename-inp"; inp.maxLength=30;
+        inp.value=cur; inp.className="mgr-card-rename-inp"; inp.maxLength=30;
         const doSave=async()=>{
           const newName=inp.value.trim();
-          if(!newName){inp.remove();if(nameEl) nameEl.innerHTML=escapeHtml(cur)+(mem&&mem.user_id===cloudUser.id?` <em>(moi)</em>`:"");return;}
+          if(!newName||newName===cur){ await renderManage(); return; }
           try{
-            await supa.rpc("chef_rename_member",{target_uid:uid, new_name:newName});
+            await supa.rpc("chef_rename_member",{target_uid:uid,new_name:newName});
             if(mem) mem.display_name=newName;
             await renderManage();
           }catch(e){ alert("Erreur renommage : "+e.message); await renderManage(); }
         };
         inp.addEventListener("blur",doSave);
-        inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){inp.blur();} if(e.key==="Escape"){inp.remove();nameEl.innerHTML=escapeHtml(cur)+(mem&&mem.user_id===cloudUser.id?` <em>(moi)</em>`:"")+`<button class="mini mgr-rename-btn" data-ruid="${uid}" title="Renommer">✎</button>`;} });
-        nameEl.innerHTML="";
-        nameEl.appendChild(inp);
-        inp.focus(); inp.select();
+        inp.addEventListener("keydown",e=>{
+          if(e.key==="Enter") inp.blur();
+          if(e.key==="Escape"){ inp.removeEventListener("blur",doSave); renderManage(); }
+        });
+        dnEl.replaceWith(inp); inp.focus(); inp.select();
       });
     });
   };
