@@ -1112,6 +1112,7 @@ async function loadMembers(){
     const dn = r.display_name || (r.email||"—").split("@")[0];
     const label = st==="on" ? "en ligne" : timeAgo(r.last_seen);
     const badge = roleBadgeHTML(r.role);
+    const canRename = isChef() && !isMe;
     let actions = "";
     if(admin && !isMe){
       const toggle = r.role==="admin"
@@ -1119,8 +1120,15 @@ async function loadMembers(){
         : `<button class="mini" data-role="admin" data-id="${r.id}">→ admin</button>`;
       actions = `<span class="mem-actions">${toggle}<button class="mini danger" data-reset="${r.id}">réinit.</button></span>`;
     }
-    return `<div class="posed-row mem-row">
-      <span class="mem-id"><span class="online ${st}"></span><b>${escapeHtml(dn)}</b>${badge}${isMe?' <em>(moi)</em>':''}<small class="mem-email">${escapeHtml(r.email||"")}</small></span>
+    return `<div class="posed-row mem-row" data-mid="${r.id}">
+      <span class="mem-id">
+        <span class="online ${st}"></span>
+        <span class="mem-name-wrap">
+          <b class="mem-dname">${escapeHtml(dn)}</b>${badge}${isMe?' <em>(moi)</em>':''}
+          ${canRename?`<button class="mini mem-rename-btn" data-uid="${r.id}" data-cur="${escapeHtml(dn)}" title="Renommer">✎</button>`:''}
+        </span>
+        <small class="mem-email">${escapeHtml(r.email||"")}</small>
+      </span>
       <span class="mem-right"><span class="mem-meta">${label}</span>${actions}</span>
     </div>`;
   }).join("");
@@ -1135,6 +1143,33 @@ async function loadMembers(){
       try{ await supa.rpc("admin_reset_planning",{ target:b.dataset.reset }); alert("Planning réinitialisé."); }
       catch(e){ alert("Erreur : "+e.message); }
     }));
+  }
+  // Renommage inline (chef/admin/dev)
+  if(isChef()){
+    $$("#memList .mem-rename-btn").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const uid = btn.dataset.uid;
+        const cur = btn.dataset.cur;
+        const row = btn.closest(".mem-row");
+        const nameEl = row ? row.querySelector(".mem-dname") : null;
+        if(!nameEl) return;
+        const inp = document.createElement("input");
+        inp.value = cur; inp.className = "mgr-rename-inp"; inp.maxLength = 30;
+        inp.style.cssText = "width:130px;font-size:.88rem";
+        const doSave = async ()=>{
+          const newName = inp.value.trim();
+          if(!newName || newName === cur){ await loadMembers(); return; }
+          try{
+            await supa.rpc("chef_rename_member", { target_uid:uid, new_name:newName });
+            await loadMembers();
+          }catch(e){ alert("Erreur : "+e.message); await loadMembers(); }
+        };
+        inp.addEventListener("blur", doSave);
+        inp.addEventListener("keydown", e=>{ if(e.key==="Enter") inp.blur(); if(e.key==="Escape"){ inp.removeEventListener("blur",doSave); loadMembers(); } });
+        nameEl.replaceWith(inp);
+        inp.focus(); inp.select();
+      });
+    });
   }
   if(btn){ btn.disabled = false; btn.classList.remove("mem-refresh-loading"); }
 }
