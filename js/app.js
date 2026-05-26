@@ -669,9 +669,15 @@ function isAdmin(){ return !!(cloudProfile && cloudProfile.role === "admin"); }
 function isChef(){ return !!(cloudProfile && (cloudProfile.role === "admin" || cloudProfile.role === "chef")); }
 function isDev(){ return !!(cloudProfile && cloudProfile.role === "dev"); }
 function roleBadgeHTML(role){
-  const map = { admin:["ADMIN","admin"], chef:["CHEF","chef"], dev:["DEV","dev"], user:["MEMBRE","membre"], membre:["MEMBRE","membre"] };
-  const [label, cls] = map[role] || ["MEMBRE","membre"];
-  return `<span class="role-badge ${cls}">${label}</span>`;
+  const cfg = {
+    admin: { label:"ADMIN",  cls:"admin",  bg:"#ecebfd", color:"#4338ca" },
+    chef:  { label:"CHEF",   cls:"chef",   bg:"#dcfce7", color:"#15803d" },
+    dev:   { label:"DEV",    cls:"dev",    bg:"#fff3cd", color:"#92400e" },
+    user:  { label:"MEMBRE", cls:"membre", bg:"#e7eaf1", color:"#6b7488" },
+    membre:{ label:"MEMBRE", cls:"membre", bg:"#e7eaf1", color:"#6b7488" }
+  };
+  const r = cfg[role] || cfg.user;
+  return `<span class="role-badge ${r.cls}" style="background:${r.bg};color:${r.color}">${r.label}</span>`;
 }
 function leaveColor(code, st){
   const arr = (st && st.types) || state.types || [];
@@ -1377,11 +1383,21 @@ function adminBindEvents(){
     if(isMe && (newRole==="user"||newRole==="membre")){
       if(!confirm("Tu vas retirer ton propre rôle admin. Tu perdras l'accès à ce panneau. Continuer ?")){ sel.value=sel.dataset.cur; return; }
     }
+    sel.disabled = true;
     try{
-      await supa.rpc("set_role",{target:sel.dataset.uid, new_role:newRole});
+      // PATCH direct sur la table (supporte tous les rôles, dont chef et dev)
+      const { error } = await supa.from("profiles").update({ role: newRole }).eq("id", sel.dataset.uid);
+      if(error) throw error;
       if(isMe){ cloudProfile = cloudProfile||{}; cloudProfile.role=newRole; refreshChipCloud(); const at=$("#adminTab"); if(at) at.hidden=!isAdmin(); }
       await adminLoadAll();
-    }catch(e){ alert("Erreur rôle : "+e.message); sel.value=sel.dataset.cur; }
+    }catch(e){
+      // Fallback : essaie le RPC si le PATCH est bloqué par RLS
+      try{
+        await supa.rpc("set_role",{target:sel.dataset.uid, new_role:newRole});
+        if(isMe){ cloudProfile = cloudProfile||{}; cloudProfile.role=newRole; refreshChipCloud(); }
+        await adminLoadAll();
+      }catch(e2){ alert("Erreur changement de rôle : "+e2.message); sel.value=sel.dataset.cur; sel.disabled=false; }
+    }
   }));
 
   // Réinit planning
