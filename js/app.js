@@ -1112,7 +1112,7 @@ async function loadMembers(){
     const dn = r.display_name || (r.email||"—").split("@")[0];
     const label = st==="on" ? "en ligne" : timeAgo(r.last_seen);
     const badge = roleBadgeHTML(r.role);
-    const canRename = isChef() && !isMe;
+    const canRename = isAdmin() && !isMe;
     let actions = "";
     if(admin && !isMe){
       const toggle = r.role==="admin"
@@ -1144,8 +1144,8 @@ async function loadMembers(){
       catch(e){ alert("Erreur : "+e.message); }
     }));
   }
-  // Renommage inline (chef/admin/dev)
-  if(isChef()){
+  // Renommage inline (admin/dev uniquement)
+  if(isAdmin()){
     $$("#memList .mem-rename-btn").forEach(btn=>{
       btn.addEventListener("click", ()=>{
         const uid = btn.dataset.uid;
