@@ -475,8 +475,20 @@ function bindEvents(){
   // Modale
   $("#closeModal").addEventListener("click", closeModal);
   $("#modalBg").addEventListener("click", e=>{ if(e.target.id==="modalBg") closeModal(); });
-  $("#clearDay").addEventListener("click", ()=>{ if(modalDateISO){ delete state.leaves[modalDateISO]; save(); closeModal(); renderAll(); } });
-  $("#saveDay").addEventListener("click", saveDay);
+  $("#clearDay").addEventListener("click", async ()=>{
+    if(!modalDateISO) return;
+    if(teamEditUID){
+      try{
+        const { error } = await supa.rpc("chef_save_leave",{ target_uid:teamEditUID, date_iso:modalDateISO, leave_code:"", leave_minutes:0 });
+        if(error) throw error;
+        if(teamEditMemberSt && teamEditMemberSt.leaves) delete teamEditMemberSt.leaves[modalDateISO];
+        closeModal(); renderTeam();
+      }catch(e){ alert("Erreur : "+e.message); }
+      return;
+    }
+    delete state.leaves[modalDateISO]; save(); closeModal(); renderAll();
+  });
+  $("#saveDay").addEventListener("click", ()=> saveDay());
 
   // Heures
   $("#saveHours").addEventListener("click", ()=>{
@@ -538,113 +550,157 @@ function renderLegend(){
 function renderCalendar(){
   const cal = $("#calendar");
   const days = buildDays();
-  if(!days.length){ cal.innerHTML = `<p class="empty">Choisis une cadence et des dates puis « Générer ».</p>`; return; }
+  if(!days.length){
+    cal.innerHTML = `<div class="p4-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="48" height="48"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 3v3M16 3v3"/></svg><p>Choisis une cadence et des dates, puis clique sur <b>Générer</b>.</p></div>`;
+    return;
+  }
 
-  // Resume
-  const workDays = days.filter(d=>d.work).length;
+  const workDays  = days.filter(d=>d.work).length;
   const leavesCount = days.filter(d=>state.leaves[d.iso]).length;
-  const workMin = workDays * CONFIG.vacationMinutes;
-  $("#planSummary").innerHTML = `
-    <div class="s"><b>${workDays}</b><span>vacations</span></div>
-    <div class="s"><b>${fmtMin(workMin)}</b><span>temps de travail</span></div>
-    <div class="s"><b>${leavesCount}</b><span>jours posés</span></div>
-    <div class="s"><b>${days.length}</b><span>jours au total</span></div>`;
+  const workMin   = workDays * CONFIG.vacationMinutes;
+  const consumed  = days.reduce((a,d)=>{ const lv=state.leaves[d.iso]; if(!lv) return a; const ty=typeByCode(lv.code); return a+((ty&&ty.consommeHeures)?lv.minutes:0); },0);
+  const avail     = state.remainingMinutes - consumed;
+  const bookable  = avail > 0 ? Math.floor(avail / CONFIG.vacationMinutes) : 0;
 
-  // Groupage par mois
+  $("#planSummary").innerHTML = `
+    <div class="s s-amber"><b>${workDays}</b><span>vacations</span></div>
+    <div class="s s-indigo"><b>${fmtMin(workMin)}</b><span>heures trav.</span></div>
+    <div class="s s-green"><b>${leavesCount}</b><span>jours posés</span></div>
+    <div class="s s-purple"><b>${bookable}</b><span>posables</span></div>`;
+
   const months = {};
   days.forEach(d=>{
-    const key = d.date.getFullYear()+"-"+d.date.getMonth();
-    (months[key] = months[key] || []).push(d);
+    const k = d.date.getFullYear()+"-"+String(d.date.getMonth()).padStart(2,"0");
+    (months[k] = months[k]||[]).push(d);
   });
+  const todayISO = isoOf(new Date());
 
   let html = "";
-  for(const key of Object.keys(months)){
-    const arr = months[key];
-    const first = arr[0].date;
+  for(const k of Object.keys(months).sort()){
+    const arr = months[k], first = arr[0].date;
     const title = capit(first.toLocaleDateString("fr-FR",{month:"long",year:"numeric"}));
     const wd = arr.filter(d=>d.work).length;
-    html += `<div class="month"><h3>${title}<small>${wd} vacation(s)</small></h3><div class="days">`;
+    const posed = arr.filter(d=>state.leaves[d.iso]).length;
+    const offset = (new Date(first.getFullYear(),first.getMonth(),1).getDay()+6)%7;
+
+    html += `<div class="p4-month"><div class="p4-mhd">
+      <h3>${title}</h3>
+      <div class="p4-chips">
+        <span class="p4-chip amber">${wd} vac.</span>
+        ${posed?`<span class="p4-chip green">${posed} posé(s)</span>`:""}
+      </div></div>
+      <div class="p4-whd"><span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span class="we-h">Sam</span><span class="we-h">Dim</span></div>
+      <div class="p4-grid">`;
+
+    for(let i=0; i<offset; i++) html += `<div class="p4-cell empty"></div>`;
+
     arr.forEach(d=>{
-      const dow = d.date.toLocaleDateString("fr-FR",{weekday:"short"});
-      const we = (d.date.getDay()===0 || d.date.getDay()===6) ? " we":"";
-      const lv = state.leaves[d.iso];
-      const cls = (d.work?"work":"rest") + we + (lv?" has-leave":"");
-      let leaveTag = "";
-      if(lv){
-        const ty = typeByCode(lv.code);
-        const col = ty ? ty.couleur : "#888";
-        leaveTag = `<span class="leave" style="background:${col}">${lv.code}</span>`;
-        if(ty && ty.partiel) leaveTag += `<span class="leave-min">${fmtMin(lv.minutes)}</span>`;
-      }
-      const badge = d.work ? `<span class="badge">${CONFIG.vacationLabel}</span>` : `<span class="badge">Repos</span>`;
-      html += `<div class="day ${cls}" data-iso="${d.iso}">
-        <div class="dow">${dow}</div>
-        <div class="num">${d.date.getDate()}</div>
-        ${badge}${leaveTag}
+      const lv = state.leaves[d.iso], ty = lv ? typeByCode(lv.code) : null;
+      const isToday = d.iso === todayISO;
+      const isWE = d.date.getDay()===0 || d.date.getDay()===6;
+      const cls = (d.work?"work":"rest") + (isWE?" we":"") + (lv?" lv":"") + (isToday?" now":"");
+      const bord = lv && ty ? `style="border-left:4px solid ${ty.couleur}"` : "";
+      html += `<div class="p4-cell ${cls}" data-iso="${d.iso}" ${bord}>
+        <span class="p4-n${isToday?" p4-today":""}">${d.date.getDate()}</span>
+        ${lv ? `<span class="p4-lcode" style="background:${ty?ty.couleur:"#888"}">${lv.code}</span>`
+             : (d.work ? `<span class="p4-vtag">V</span>` : ``)}
+        ${lv && ty && ty.partiel ? `<span class="p4-lmin">${fmtMin(lv.minutes)}</span>` : ""}
       </div>`;
     });
     html += `</div></div>`;
   }
   cal.innerHTML = html;
-
-  $$(".day").forEach(el=> el.addEventListener("click", ()=> openModal(el.dataset.iso)));
+  $$(".p4-cell[data-iso]").forEach(el => el.addEventListener("click", ()=> openModal(el.dataset.iso)));
 }
 
 /* ===================== Modale jour ===================== */
-function openModal(iso){
-  modalDateISO = iso;
-  const days = buildDays();
-  const dd = days.find(d=>d.iso===iso);
-  const date = parseISO(iso);
-  $("#modalDate").textContent = capit(date.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"}));
-  $("#modalState").textContent = dd && dd.work ? `Jour travaillé — vacation ${CONFIG.vacationLabel}` : "Jour de repos";
+// Team edit context (chef/admin modifying another member's leave)
+let teamEditUID = null, teamEditName = null, teamEditMemberSt = null;
 
-  const cur = state.leaves[iso];
+function openTeamLeaveModal(uid, memberName, iso, memberSt){
+  teamEditUID = uid; teamEditName = memberName; teamEditMemberSt = memberSt;
+  openModal(iso, memberSt);
+}
+
+function openModal(iso, memberSt){
+  modalDateISO = iso;
+  const activeSt = memberSt || state;
+  const date = parseISO(iso);
+
+  if(teamEditUID){
+    const ds = dayStatus(activeSt, iso);
+    $("#modalDate").textContent = `${teamEditName} — ${capit(date.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}))}`;
+    $("#modalState").textContent = !ds.inRange ? "Hors plage de planning" : (ds.work ? `Vacation ${CONFIG.vacationLabel}` : "Jour de repos");
+  } else {
+    const days = buildDays();
+    const dd = days.find(d=>d.iso===iso);
+    $("#modalDate").textContent = capit(date.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"}));
+    $("#modalState").textContent = dd && dd.work ? `Jour travaillé — vacation ${CONFIG.vacationLabel}` : "Jour de repos";
+  }
+
+  const cur = activeSt.leaves ? activeSt.leaves[iso] : null;
   modalSelected = cur ? cur.code : null;
+  const types = (activeSt.types && activeSt.types.length) ? activeSt.types : state.types;
 
   const wrap = $("#modalTypes");
   wrap.innerHTML = "";
-  state.types.forEach(ty=>{
+  types.forEach(ty=>{
     const b = document.createElement("button");
     b.className = "mt" + (modalSelected===ty.code?" sel":"");
-    b.innerHTML = `<span class="dot" style="background:${ty.couleur}"></span>${ty.code}`;
+    b.innerHTML = `<span class="dot" style="background:${ty.couleur}"></span><span style="font-weight:800">${ty.code}</span><span class="mt-label">${ty.label}</span>`;
     b.title = ty.label;
     b.addEventListener("click", ()=>{
       modalSelected = (modalSelected===ty.code)? null : ty.code;
       $$("#modalTypes .mt").forEach(x=>x.classList.remove("sel"));
       if(modalSelected===ty.code) b.classList.add("sel");
-      togglePartiel();
+      togglePartiel(types);
     });
     wrap.appendChild(b);
   });
 
   const partH = $("#partielH");
   partH.value = (cur && cur.minutes!=null) ? (cur.minutes/60) : "";
-  togglePartiel();
+  togglePartiel(types);
 
   const mb = $("#modalBg"); mb.hidden = false; mb.style.display = "grid";
 }
-function togglePartiel(){
-  const ty = modalSelected ? typeByCode(modalSelected) : null;
+function togglePartiel(types){
+  const tyList = types || state.types;
+  const ty = modalSelected ? tyList.find(t=>t.code===modalSelected) : null;
   const show = !!(ty && ty.partiel);
   const w = $("#partielWrap");
   w.hidden = !show; w.style.display = show ? "flex" : "none";
 }
-function saveDay(){
+async function saveDay(){
   if(!modalDateISO) return;
+  if(teamEditUID){
+    const code = modalSelected || "";
+    const tyList = (teamEditMemberSt && teamEditMemberSt.types && teamEditMemberSt.types.length) ? teamEditMemberSt.types : state.types;
+    const ty = code ? tyList.find(t=>t.code===code) : null;
+    let minutes = ty ? ty.minutesParDefaut : 0;
+    if(ty && ty.partiel){ const h=parseFloat($("#partielH").value||0); minutes=Math.round(h*60); }
+    try{
+      const { error } = await supa.rpc("chef_save_leave",{ target_uid:teamEditUID, date_iso:modalDateISO, leave_code:code, leave_minutes:minutes });
+      if(error) throw error;
+      if(teamEditMemberSt){ if(!teamEditMemberSt.leaves) teamEditMemberSt.leaves={}; if(code) teamEditMemberSt.leaves[modalDateISO]={code,minutes}; else delete teamEditMemberSt.leaves[modalDateISO]; }
+      closeModal(); renderTeam();
+    }catch(e){ alert("Erreur : "+e.message); }
+    return;
+  }
   if(!modalSelected){ delete state.leaves[modalDateISO]; }
   else{
     const ty = typeByCode(modalSelected);
     let minutes = ty.minutesParDefaut;
-    if(ty.partiel){
-      const h = parseFloat($("#partielH").value||0);
-      minutes = Math.round(h*60);
-    }
+    if(ty.partiel){ const h=parseFloat($("#partielH").value||0); minutes=Math.round(h*60); }
     state.leaves[modalDateISO] = { code:modalSelected, minutes };
   }
   save(); closeModal(); renderAll();
 }
-function closeModal(){ const mb=$("#modalBg"); mb.hidden = true; mb.style.display="none"; modalDateISO=null; modalSelected=null; }
+function closeModal(){
+  const mb=$("#modalBg"); mb.hidden=true; mb.style.display="none";
+  modalDateISO=null; modalSelected=null;
+  teamEditUID=null; teamEditName=null; teamEditMemberSt=null;
+}
 
 /* Statut d'un jour pour un planning donné (utilisé aussi pour l'équipe) */
 function cycleFor(key){ return (CONFIG.cadences[key] || CONFIG.cadences["2-2-3"]).cycle; }
@@ -665,8 +721,8 @@ function displayName(){
   if(cloudProfile && cloudProfile.display_name) return cloudProfile.display_name;
   return cloudUser ? cloudUser.email.split("@")[0] : "Moi";
 }
-function isAdmin(){ return !!(cloudProfile && cloudProfile.role === "admin"); }
-function isChef(){ return !!(cloudProfile && (cloudProfile.role === "admin" || cloudProfile.role === "chef")); }
+function isAdmin(){ return !!(cloudProfile && (cloudProfile.role === "admin" || cloudProfile.role === "dev")); }
+function isChef(){ return !!(cloudProfile && (cloudProfile.role === "admin" || cloudProfile.role === "chef" || cloudProfile.role === "dev")); }
 function isDev(){ return !!(cloudProfile && cloudProfile.role === "dev"); }
 function roleBadgeHTML(role){
   const cfg = {
@@ -797,6 +853,7 @@ function renderTeam(){
     head += `<th class="dcol${we}"><span>${d}</span><small>${dt.toLocaleDateString("fr-FR",{weekday:"narrow"})}</small></th>`;
   }
 
+  const canEdit = isChef();
   teamMembers.sort((a,b)=>(a.display_name||"").localeCompare(b.display_name||""));
   let rows = "";
   teamMembers.forEach(mem=>{
@@ -807,12 +864,16 @@ function renderTeam(){
       const iso = isoOf(new Date(y,m,d));
       const s = dayStatus(st, iso);
       const today = iso===todayISO ? " today":"";
-      if(!s.inRange){ cells += `<td class="cell out${today}"></td>`; }
-      else if(s.leave){ cells += `<td class="cell lv${today}" style="background:${leaveColor(s.leave.code, st)}" title="${escapeHtml(s.leave.code)}">${escapeHtml(s.leave.code[0])}</td>`; }
-      else if(s.work){ cells += `<td class="cell work${today}" title="Vacation 12h08"></td>`; }
-      else { cells += `<td class="cell rest${today}"></td>`; }
+      const editable = canEdit && !isMe && s.inRange;
+      const editAttr = editable ? ` data-euid="${mem.user_id}" data-eiso="${iso}"` : "";
+      const editStyle = editable ? " editable" : "";
+      if(!s.inRange){ cells += `<td class="cell out${today}${editStyle}"${editAttr}></td>`; }
+      else if(s.leave){ cells += `<td class="cell lv${today}${editStyle}" style="background:${leaveColor(s.leave.code, st)}"${editAttr} title="${escapeHtml(s.leave.code)}">${escapeHtml(s.leave.code[0])}</td>`; }
+      else if(s.work){ cells += `<td class="cell work${today}${editStyle}"${editAttr} title="Vacation"></td>`; }
+      else { cells += `<td class="cell rest${today}${editStyle}"${editAttr}></td>`; }
     }
-    rows += `<tr><td class="mname${isMe?' me':''}">${escapeHtml(mem.display_name||'?')}</td>${cells}</tr>`;
+    const dnLabel = escapeHtml(mem.display_name||'?');
+    rows += `<tr><td class="mname${isMe?' me':''}">${dnLabel}${isMe?` <em>(moi)</em>`:''}</td>${cells}</tr>`;
   });
 
   const gridCard = `
@@ -841,6 +902,16 @@ function renderTeam(){
   $("#tmNext").addEventListener("click", ()=>{ teamMonth = new Date(y, m+1, 1); renderTeam(); });
   $$("#teamView [data-mine]").forEach(b=> b.addEventListener("click", ()=> setMyCrew(b.dataset.mine)));
   $$("#teamView .crew-set").forEach(s=> s.addEventListener("change", ()=> setMemberCrew(s.dataset.uid, s.value)));
+  if(canEdit){
+    $$("#teamView [data-euid]").forEach(td=>{
+      td.addEventListener("click", ()=>{
+        const uid = td.dataset.euid, iso = td.dataset.eiso;
+        const mem = teamMembers.find(m=>m.user_id===uid);
+        const memberSt = teamPlannings[uid] || {};
+        openTeamLeaveModal(uid, mem ? (mem.display_name||mem.user_id) : "?", iso, memberSt);
+      });
+    });
+  }
 }
 
 /* Prochain cycle = prochain bloc de vacations du planning de l'utilisateur */
