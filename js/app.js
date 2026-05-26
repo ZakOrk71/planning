@@ -1277,7 +1277,7 @@ function adminRenderMemberList(){
       <span class="admin-mem-brigade" title="${escapeHtml(brigs)}">${brigs}</span>
       <span class="admin-mem-activity">${st==="on"?"en ligne":timeAgo(r.last_seen)}</span>
       <span class="admin-mem-actions">
-        <select class="admin-role-sel" data-uid="${r.id}" data-cur="${r.role||"user"}"${isMe?" disabled":""} title="Changer le rôle">${opts}</select>
+        <select class="admin-role-sel" data-uid="${r.id}" data-cur="${r.role||"user"}" data-isme="${isMe}" title="Changer le rôle">${opts}</select>
         ${isMe?"" : `<button class="mini danger" data-reset-plan="${r.id}" title="Réinitialiser le planning">Réinit.</button>`}
       </span>
     </div>`;
@@ -1373,8 +1373,13 @@ function adminBindEvents(){
   $$(".admin-role-sel").forEach(sel=>sel.addEventListener("change",async()=>{
     let newRole=sel.value;
     if(newRole==="membre") newRole="user";
+    const isMe = sel.dataset.isme==="true";
+    if(isMe && (newRole==="user"||newRole==="membre")){
+      if(!confirm("Tu vas retirer ton propre rôle admin. Tu perdras l'accès à ce panneau. Continuer ?")){ sel.value=sel.dataset.cur; return; }
+    }
     try{
       await supa.rpc("set_role",{target:sel.dataset.uid, new_role:newRole});
+      if(isMe){ cloudProfile = cloudProfile||{}; cloudProfile.role=newRole; refreshChipCloud(); const at=$("#adminTab"); if(at) at.hidden=!isAdmin(); }
       await adminLoadAll();
     }catch(e){ alert("Erreur rôle : "+e.message); sel.value=sel.dataset.cur; }
   }));
