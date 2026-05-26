@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=16.0" />
+  <link rel="stylesheet" href="css/style.css?v=16.1" />
 </head>
 <body>
 
@@ -76,14 +76,10 @@
 
     <section class="panel" id="tab-heures">
       <div class="card">
-        <div class="card-head"><h2>Compteur d'heures</h2></div>
-        <p class="muted">Saisis les heures qu'il te reste. L'appli déduit ce que tu as déjà posé et calcule combien de vacations tu peux encore poser.</p>
-        <div class="hours-input">
-          <div class="ctrl"><label>Heures restantes</label><input type="number" id="remH" min="0" step="1" placeholder="0" /></div>
-          <span class="hsep">h</span>
-          <div class="ctrl"><label>Minutes</label><input type="number" id="remM" min="0" max="59" step="1" placeholder="0" /></div>
-          <button class="btn primary" id="saveHours">Enregistrer</button>
-        </div>
+        <div class="card-head"><h2>Compteur d'heures par type</h2></div>
+        <p class="muted">Saisis les heures restantes pour chaque type de congé. L'appli calcule ce que tu peux encore poser.</p>
+        <div id="hoursTypeInputs"></div>
+        <button class="btn primary block" id="saveHours" style="margin-top:16px">Enregistrer</button>
       </div>
       <div class="stats" id="hourStats"></div>
       <div class="card">
@@ -177,8 +173,8 @@
     </div>
   </div>
 
-  <span class="vbadge">v16.0</span>
+  <span class="vbadge">v16.1</span>
   <script src="js/config.js?v=10"></script>
-  <script src="js/app.js?v=16.0"></script>
+  <script src="js/app.js?v=16.1"></script>
 </body>
 </html>

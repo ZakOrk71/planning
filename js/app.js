@@ -84,7 +84,8 @@ function freshState(){
     endDate: null,
     leaves: {},
     types: JSON.parse(JSON.stringify((FILE_TYPES || DEFAULT_CONGES.types))),
-    remainingMinutes: 0
+    remainingMinutes: 0,
+    remainingByType: {}
   };
 }
 
@@ -394,8 +395,8 @@ function syncInputsFromState(){
   $("#cadenceSelect").value = state.cadence;
   $("#startDate").value = state.startDate;
   $("#endDate").value = state.endDate;
-  $("#remH").value = Math.floor((state.remainingMinutes||0)/60) || "";
-  $("#remM").value = (state.remainingMinutes||0)%60 || "";
+  const remH = $("#remH"); if(remH) remH.value = Math.floor((state.remainingMinutes||0)/60) || "";
+  const remM = $("#remM"); if(remM) remM.value = (state.remainingMinutes||0)%60 || "";
   updateCadenceNote();
 }
 
@@ -482,7 +483,7 @@ function bindEvents(){
         const { error } = await supa.rpc("chef_save_leave",{ target_uid:teamEditUID, date_iso:modalDateISO, leave_code:"", leave_minutes:0 });
         if(error) throw error;
         if(teamEditMemberSt && teamEditMemberSt.leaves) delete teamEditMemberSt.leaves[modalDateISO];
-        closeModal(); renderTeam();
+        const cb = teamEditCallback; closeModal(); if(cb) cb(); else renderTeam();
       }catch(e){ alert("Erreur : "+e.message); }
       return;
     }
@@ -490,11 +491,16 @@ function bindEvents(){
   });
   $("#saveDay").addEventListener("click", ()=> saveDay());
 
-  // Heures
+  // Heures — lecture des inputs dynamiques par type
   $("#saveHours").addEventListener("click", ()=>{
-    const h = parseInt($("#remH").value||0,10);
-    const m = parseInt($("#remM").value||0,10);
-    state.remainingMinutes = Math.max(0, h*60 + m);
+    if(!state.remainingByType) state.remainingByType = {};
+    $$(".rem-h-inp").forEach(inp=>{
+      const code = inp.dataset.code;
+      const mInp = document.querySelector(`.rem-m-inp[data-code="${code}"]`);
+      const h = parseInt(inp.value||0,10), m = parseInt(mInp?mInp.value||0:0,10);
+      state.remainingByType[code] = Math.max(0, h*60+m);
+    });
+    state.remainingMinutes = Object.values(state.remainingByType).reduce((a,b)=>a+b, 0);
     save(); renderHours();
   });
 
@@ -615,10 +621,11 @@ function renderCalendar(){
 
 /* ===================== Modale jour ===================== */
 // Team edit context (chef/admin modifying another member's leave)
-let teamEditUID = null, teamEditName = null, teamEditMemberSt = null;
+let teamEditUID = null, teamEditName = null, teamEditMemberSt = null, teamEditCallback = null;
 
-function openTeamLeaveModal(uid, memberName, iso, memberSt){
+function openTeamLeaveModal(uid, memberName, iso, memberSt, callback){
   teamEditUID = uid; teamEditName = memberName; teamEditMemberSt = memberSt;
+  teamEditCallback = callback || null;
   openModal(iso, memberSt);
 }
 
@@ -683,7 +690,7 @@ async function saveDay(){
       const { error } = await supa.rpc("chef_save_leave",{ target_uid:teamEditUID, date_iso:modalDateISO, leave_code:code, leave_minutes:minutes });
       if(error) throw error;
       if(teamEditMemberSt){ if(!teamEditMemberSt.leaves) teamEditMemberSt.leaves={}; if(code) teamEditMemberSt.leaves[modalDateISO]={code,minutes}; else delete teamEditMemberSt.leaves[modalDateISO]; }
-      closeModal(); renderTeam();
+      const cb = teamEditCallback; closeModal(); if(cb) cb(); else renderTeam();
     }catch(e){ alert("Erreur : "+e.message); }
     return;
   }
@@ -699,7 +706,7 @@ async function saveDay(){
 function closeModal(){
   const mb=$("#modalBg"); mb.hidden=true; mb.style.display="none";
   modalDateISO=null; modalSelected=null;
-  teamEditUID=null; teamEditName=null; teamEditMemberSt=null;
+  teamEditUID=null; teamEditName=null; teamEditMemberSt=null; teamEditCallback=null;
 }
 
 /* Statut d'un jour pour un planning donné (utilisé aussi pour l'équipe) */
@@ -772,6 +779,7 @@ function renderTeamManage(){
       <span class="grp-name">${escapeHtml(g.name)}</span>
       <span class="grp-code">code <b>${g.code}</b> <button class="mini" data-copy="${g.code}">copier</button></span>
       <span class="grp-act">
+        ${isChef()?`<button class="btn small primary" data-manage="${g.id}">⚙ Gérer</button>`:""}
         <button class="btn small" data-open="${g.id}">Voir</button>
         <button class="btn small danger" data-leave="${g.id}">Quitter</button>
       </span>
@@ -790,6 +798,7 @@ function renderTeamManage(){
   }));
   $$("#teamManage [data-open]").forEach(b=> b.addEventListener("click", ()=> openGroup(b.dataset.open)));
   $$("#teamManage [data-leave]").forEach(b=> b.addEventListener("click", ()=> leaveGroup(b.dataset.leave)));
+  $$("#teamManage [data-manage]").forEach(b=> b.addEventListener("click", ()=> renderManageOverlay(b.dataset.manage)));
 }
 
 async function createGroup(){
@@ -1131,48 +1140,73 @@ async function loadMembers(){
 }
 
 function renderHours(){
+  if(!state.remainingByType) state.remainingByType = {};
   const days = buildDays();
-  let consumed = 0, posedCount = 0;
-  const posed = [];
+  const consumedByType = {}, posedByType = {}, posedItems = [];
+
   days.forEach(d=>{
-    const lv = state.leaves[d.iso];
-    if(!lv) return;
-    const ty = typeByCode(lv.code);
-    posedCount++;
-    const c = (ty && ty.consommeHeures) ? lv.minutes : 0;
-    consumed += c;
-    posed.push({ iso:d.iso, date:d.date, lv, ty, cost:c });
+    const lv = state.leaves[d.iso]; if(!lv) return;
+    const ty = typeByCode(lv.code); if(!ty) return;
+    posedItems.push({ iso:d.iso, date:d.date, lv, ty });
+    if(ty.consommeHeures){
+      consumedByType[lv.code] = (consumedByType[lv.code]||0) + lv.minutes;
+      posedByType[lv.code]    = (posedByType[lv.code]||0) + 1;
+    }
   });
 
-  const remaining = state.remainingMinutes;
-  const available = remaining - consumed;
-  const vacM = CONFIG.vacationMinutes;
-  const bookable = available > 0 ? Math.floor(available / vacM) : 0;
+  // Inputs par type
+  const congeTypes = state.types.filter(t=>t.consommeHeures);
+  const inpContainer = $("#hoursTypeInputs");
+  if(inpContainer){
+    inpContainer.innerHTML = congeTypes.map(ty=>{
+      const rem      = state.remainingByType[ty.code] || 0;
+      const consumed = consumedByType[ty.code] || 0;
+      const avail    = rem - consumed;
+      const bookable = avail > 0 ? Math.floor(avail / CONFIG.vacationMinutes) : 0;
+      const h = Math.floor(rem/60), m = rem%60;
+      const aClass = avail < 0 ? "color:var(--danger)" : avail < CONFIG.vacationMinutes ? "color:var(--work)" : "color:var(--ok)";
+      return `<div class="hours-type-block">
+        <div class="hours-type-hd">
+          <span class="tag" style="background:${ty.couleur}">${ty.code}</span>
+          <span class="hours-type-lbl">${ty.label}</span>
+          ${posedByType[ty.code]?`<span class="hours-type-posed">${posedByType[ty.code]} posé(s) · −${fmtMin(consumed)}</span>`:""}
+        </div>
+        <div class="hours-type-row">
+          <input type="number" class="rem-h-inp" data-code="${ty.code}" min="0" step="1" placeholder="0" value="${h||""}" />
+          <span class="hsep">h</span>
+          <input type="number" class="rem-m-inp" data-code="${ty.code}" min="0" max="59" step="1" placeholder="0" value="${m||""}" />
+          <span class="hours-dispo" style="${aClass}">${fmtMin(avail)} dispo — ${bookable} vac.</span>
+        </div>
+      </div>`;
+    }).join("") || `<p class="muted">Aucun type de congé configuré. Ajoute-en dans Réglages.</p>`;
+  }
 
-  const availClass = available < 0 ? "bad" : (available < vacM ? "warn" : "good");
+  // Stats totales
+  const totalRem      = congeTypes.reduce((a,ty)=>a+(state.remainingByType[ty.code]||0), 0);
+  const totalConsumed = Object.values(consumedByType).reduce((a,b)=>a+b, 0);
+  const totalAvail    = totalRem - totalConsumed;
+  const totalBookable = totalAvail > 0 ? Math.floor(totalAvail / CONFIG.vacationMinutes) : 0;
+  const availClass    = totalAvail < 0 ? "bad" : totalAvail < CONFIG.vacationMinutes ? "warn" : "good";
+
   $("#hourStats").innerHTML = `
-    <div class="stat"><b>${fmtMin(remaining)}</b><span>heures restantes</span></div>
-    <div class="stat warn"><b>${fmtMin(consumed)}</b><span>déjà posé (${posedCount} jour·s)</span></div>
-    <div class="stat ${availClass}"><b>${fmtMin(available)}</b><span>heures disponibles</span></div>
-    <div class="stat good"><b>${bookable}</b><span>vacations posables (${CONFIG.vacationLabel})</span></div>`;
+    <div class="stat"><b>${fmtMin(totalRem)}</b><span>total restant</span></div>
+    <div class="stat warn"><b>${fmtMin(totalConsumed)}</b><span>déjà posé</span></div>
+    <div class="stat ${availClass}"><b>${fmtMin(totalAvail)}</b><span>disponible</span></div>
+    <div class="stat good"><b>${totalBookable}</b><span>vacations posables</span></div>`;
 
-  // Liste detaillee
+  // Liste détaillée
   const list = $("#posedList");
-  if(!posed.length){ list.innerHTML = `<p class="empty">Aucun congé posé. Clique sur un jour du planning pour en ajouter.</p>`; return; }
-  posed.sort((a,b)=>a.iso.localeCompare(b.iso));
-  list.innerHTML = posed.map(p=>{
-    const col = p.ty ? p.ty.couleur : "#888";
-    const lbl = p.ty ? p.ty.label : p.lv.code;
+  if(!posedItems.length){ list.innerHTML=`<p class="empty">Aucun congé posé. Clique sur un jour du planning pour en ajouter.</p>`; return; }
+  posedItems.sort((a,b)=>a.iso.localeCompare(b.iso));
+  list.innerHTML = posedItems.map(p=>{
     const dstr = capit(p.date.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}));
-    const cost = p.cost ? `−${fmtMin(p.cost)}` : "n'entame pas le compteur";
+    const cost = p.ty.consommeHeures ? `−${fmtMin(p.lv.minutes)}` : "hors compteur";
     return `<div class="posed-row">
-      <span><span class="tag" style="background:${col}">${p.lv.code}</span> ${dstr} — ${lbl}</span>
+      <span><span class="tag" style="background:${p.ty.couleur}">${p.lv.code}</span> ${dstr} — ${p.ty.label}</span>
       <span>${cost} <button class="rm" data-iso="${p.iso}">✕</button></span>
     </div>`;
   }).join("");
-  $$("#posedList .rm").forEach(b=> b.addEventListener("click", ()=>{
-    delete state.leaves[b.dataset.iso]; save(); renderAll();
-  }));
+  $$("#posedList .rm").forEach(b=>b.addEventListener("click",()=>{ delete state.leaves[b.dataset.iso]; save(); renderAll(); }));
 }
 
 /* ===================== Onglet Reglages ===================== */
@@ -1515,6 +1549,171 @@ function adminBindPlanNav(){
   const prev=$("#adminPlanPrev"), next=$("#adminPlanNext");
   if(prev) prev.onclick=async()=>{ adminPlanMonth=new Date(adminPlanMonth.getFullYear(),adminPlanMonth.getMonth()-1,1); await adminRenderPlanning(); adminBindPlanNav(); };
   if(next) next.onclick=async()=>{ adminPlanMonth=new Date(adminPlanMonth.getFullYear(),adminPlanMonth.getMonth()+1,1); await adminRenderPlanning(); adminBindPlanNav(); };
+}
+
+/* ===================== Panneau GÉRER (chef/admin/dev) ===================== */
+async function renderManageOverlay(gid){
+  if(!CLOUD || !cloudUser) return;
+  const g = teamGroups.find(x=>x.id===gid) || { id:gid, name:"Brigade", code:"" };
+
+  let overlay = $("#manageOverlay");
+  if(!overlay){
+    overlay = document.createElement("div");
+    overlay.id = "manageOverlay";
+    overlay.className = "manage-overlay";
+    overlay.setAttribute("hidden","");
+    document.body.appendChild(overlay);
+  }
+  overlay.removeAttribute("hidden");
+  overlay.innerHTML = `<div class="manage-inner">
+    <div class="manage-topbar">
+      <button class="btn small" id="manageClose">✕ Fermer</button>
+      <div class="manage-title">
+        <h2>${escapeHtml(g.name)}</h2>
+        <span class="muted">code <b>${g.code}</b> · Gestion des plannings</span>
+      </div>
+      <div class="month-nav">
+        <button class="btn small" id="managePrev">‹</button>
+        <span id="manageMonthLbl"></span>
+        <button class="btn small" id="manageNext">›</button>
+      </div>
+    </div>
+    <div class="manage-body" id="manageBody"><p class="empty" style="padding:32px;text-align:center">Chargement…</p></div>
+  </div>`;
+
+  let manageMonth = new Date();
+  let brigMems = [], brigPlannings = {};
+
+  const fetchData = async ()=>{
+    try{
+      const {data} = await supa.from("group_members").select("user_id,display_name,crew").eq("group_id",gid);
+      brigMems = (data||[]).sort((a,b)=>(a.display_name||"").localeCompare(b.display_name||""));
+    }catch(e){ brigMems=[]; }
+    if(brigMems.length){
+      try{
+        const {data} = await supa.from("plannings").select("user_id,data").in("user_id",brigMems.map(m=>m.user_id));
+        brigPlannings={};
+        (data||[]).forEach(p=>brigPlannings[p.user_id]=p.data||{});
+      }catch(e){ brigPlannings={}; }
+    }
+  };
+
+  const renderManage = async ()=>{
+    const body=$("#manageBody");
+    if(!body) return;
+    body.innerHTML=`<p class="empty" style="padding:32px;text-align:center">Chargement…</p>`;
+    await fetchData();
+    const y=manageMonth.getFullYear(), m=manageMonth.getMonth();
+    const nDays=new Date(y,m+1,0).getDate();
+    const todayISO=isoOf(new Date());
+    const monthName=capit(manageMonth.toLocaleDateString("fr-FR",{month:"long",year:"numeric"}));
+    if($("#manageMonthLbl")) $("#manageMonthLbl").textContent=monthName;
+
+    // En-tête jours
+    let headCells=`<div class="mgr-name-col mgr-head-cell">Membre</div>`;
+    for(let d=1;d<=nDays;d++){
+      const dt=new Date(y,m,d), isWE=dt.getDay()===0||dt.getDay()===6;
+      headCells+=`<div class="mgr-day-hd${isWE?" we":""}">${d}<br><small>${dt.toLocaleDateString("fr-FR",{weekday:"narrow"})}</small></div>`;
+    }
+    headCells+=`<div class="mgr-crew-col mgr-head-cell">Équipage</div>`;
+
+    // Lignes membres
+    let rowsHtml="";
+    brigMems.forEach(mem=>{
+      const st=brigPlannings[mem.user_id]||{};
+      const isMe=mem.user_id===cloudUser.id;
+      const dn=escapeHtml(mem.display_name||"?");
+      let cells=`<div class="mgr-name-col">
+        <span class="mgr-name">${dn}${isMe?` <em>(moi)</em>`:""}</span>
+        ${!isMe?`<button class="mini mgr-rename-btn" data-ruid="${mem.user_id}" title="Renommer">✎</button>`:""}
+      </div>`;
+      for(let d=1;d<=nDays;d++){
+        const iso=isoOf(new Date(y,m,d));
+        const s=dayStatus(st,iso);
+        const isToday=iso===todayISO;
+        const dt=new Date(y,m,d), isWE=dt.getDay()===0||dt.getDay()===6;
+        const editable=!isMe&&s.inRange;
+        let cls="mgr-cell"+(isToday?" today":"")+(isWE&&!s.work?" we":"");
+        let style="", cnt="";
+        if(!s.inRange){cls+=" out";}
+        else if(s.leave){const col=leaveColor(s.leave.code,st);style=`background:${col};color:#fff`;cnt=s.leave.code.substring(0,2);cls+=" lv";}
+        else if(s.work){cls+=" work";cnt="V";}
+        else{cls+=" rest";}
+        const ea=editable?` data-meuid="${mem.user_id}" data-meiso="${iso}"`:"";
+        cells+=`<div class="${cls}" style="${style}"${ea}>${cnt}</div>`;
+      }
+      const crewOpts=["","Alpha","Bravo","Charlie"].map(c=>`<option value="${c}"${mem.crew===c?" selected":""}>${c||"—"}</option>`).join("");
+      cells+=`<div class="mgr-crew-col"><select class="mgr-crew-sel" data-muid="${mem.user_id}">${crewOpts}</select></div>`;
+      rowsHtml+=`<div class="mgr-row" data-uid="${mem.user_id}">${cells}</div>`;
+    });
+
+    body.innerHTML=`<div class="manage-grid-wrap"><div class="manage-grid">
+      <div class="mgr-row mgr-head">${headCells}</div>
+      ${rowsHtml||`<p class="empty" style="padding:24px">Aucun membre.</p>`}
+    </div></div>
+    <div style="padding:16px">
+      <div class="legend">
+        <span class="lg"><span class="dot" style="background:#fff7ed;border:1px solid #f59e0b"></span>Vacation (V)</span>
+        <span class="lg"><span class="dot" style="background:var(--surface2)"></span>Repos</span>
+        <span class="lg"><span class="dot" style="background:#4f46e5"></span>Congé posé</span>
+        ${isChef()?`<span class="lg" style="color:var(--accent)">✎ Cliquer une cellule pour modifier</span>`:""}
+      </div>
+    </div>`;
+
+    // Events : cellules
+    $$(".mgr-cell[data-meuid]").forEach(cell=>{
+      cell.addEventListener("click",()=>{
+        const uid=cell.dataset.meuid, iso=cell.dataset.meiso;
+        const mem=brigMems.find(m=>m.user_id===uid);
+        const mSt=brigPlannings[uid]||{};
+        openTeamLeaveModal(uid, mem?(mem.display_name||"?"):"?", iso, mSt, renderManage);
+      });
+    });
+
+    // Events : crew
+    $$(".mgr-crew-sel").forEach(sel=>{
+      sel.addEventListener("change",async()=>{
+        try{
+          await supa.rpc("set_member_crew",{gid, target:sel.dataset.muid, crew_name:sel.value});
+          const mem=brigMems.find(m=>m.user_id===sel.dataset.muid);
+          if(mem) mem.crew=sel.value;
+        }catch(e){ alert("Erreur équipage : "+e.message); }
+      });
+    });
+
+    // Events : renommer
+    $$(".mgr-rename-btn").forEach(btn=>{
+      btn.addEventListener("click",()=>{
+        const uid=btn.dataset.ruid;
+        const mem=brigMems.find(m=>m.user_id===uid);
+        const row=btn.closest(".mgr-row");
+        const nameEl=row?row.querySelector(".mgr-name"):null;
+        if(!nameEl) return;
+        const cur=(mem&&mem.display_name)||"";
+        const inp=document.createElement("input");
+        inp.value=cur; inp.className="mgr-rename-inp"; inp.maxLength=30;
+        const doSave=async()=>{
+          const newName=inp.value.trim();
+          if(!newName){inp.remove();if(nameEl) nameEl.innerHTML=escapeHtml(cur)+(mem&&mem.user_id===cloudUser.id?` <em>(moi)</em>`:"");return;}
+          try{
+            await supa.rpc("chef_rename_member",{target_uid:uid, new_name:newName});
+            if(mem) mem.display_name=newName;
+            await renderManage();
+          }catch(e){ alert("Erreur renommage : "+e.message); await renderManage(); }
+        };
+        inp.addEventListener("blur",doSave);
+        inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){inp.blur();} if(e.key==="Escape"){inp.remove();nameEl.innerHTML=escapeHtml(cur)+(mem&&mem.user_id===cloudUser.id?` <em>(moi)</em>`:"")+`<button class="mini mgr-rename-btn" data-ruid="${uid}" title="Renommer">✎</button>`;} });
+        nameEl.innerHTML="";
+        nameEl.appendChild(inp);
+        inp.focus(); inp.select();
+      });
+    });
+  };
+
+  await renderManage();
+  $("#manageClose").addEventListener("click",()=>{ overlay.setAttribute("hidden",""); });
+  $("#managePrev").addEventListener("click",async()=>{ manageMonth=new Date(manageMonth.getFullYear(),manageMonth.getMonth()-1,1); await renderManage(); });
+  $("#manageNext").addEventListener("click",async()=>{ manageMonth=new Date(manageMonth.getFullYear(),manageMonth.getMonth()+1,1); await renderManage(); });
 }
 
 /* ===================== Go ===================== */
