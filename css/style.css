@@ -426,15 +426,19 @@ input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;max-width:1
   color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:2px 8px;opacity:.7}
 
 /* ---------- Feuille — équipages ---------- */
-.fc-crews{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px}
-.fc-crew-block{flex:1 0 130px;background:var(--surface2);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px}
-.fc-crew-hd{font-weight:800;font-size:.76rem;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);margin-bottom:9px}
-.fc-crew-unassigned .fc-crew-hd{color:var(--muted)}
-.fc-crew-body{display:flex;flex-direction:column;gap:7px}
-.fc-crew-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.fc-crew-assign{padding:5px 8px;border-radius:8px;font-size:.8rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;cursor:pointer}
+.fc-crew-tags{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px}
+.fc-crew-tag{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);border:1px solid var(--accent);
+  color:var(--accent2);padding:5px 8px 5px 13px;border-radius:999px;font-size:.84rem;font-weight:700}
+.fc-del-crew{background:none;border:none;cursor:pointer;color:var(--danger);font-size:.9rem;font-weight:800;
+  padding:0 3px;line-height:1;transition:.1s;border-radius:50%}
+.fc-del-crew:hover{opacity:.7}
 .fc-add-crew{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
 .fc-add-crew-inp{flex:1;min-width:140px;padding:9px 12px;border-radius:10px;font:inherit;font-size:.88rem;border:1px solid var(--line);background:var(--surface2);color:var(--ink)}
+/* Per-day crew row inside day cards */
+.fc-crew-row-day{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:2px 0}
+.fc-day-crew-sel{font-size:.78rem;padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--surface);
+  color:var(--ink);font:inherit;cursor:pointer;min-width:85px;transition:.12s}
+.fc-day-crew-sel:focus{outline:none;border-color:var(--accent)}
 /* ---------- Feuille de cycle ---------- */
 .fc-day{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:14px;overflow:hidden;box-shadow:var(--sh)}
 .fc-day-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;

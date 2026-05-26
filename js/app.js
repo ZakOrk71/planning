@@ -1806,6 +1806,7 @@ async function renderManageOverlay(gid){
 
 /* ===================== Feuille de cycle ===================== */
 let cycleCrewNames = ["Alpha","Bravo"];
+let _cycleBrigMems = [], _cycleBrigPlannings = {};
 
 async function renderCycleTab(){
   const root=$("#cycleRoot"); if(!root) return;
@@ -1830,19 +1831,19 @@ async function renderCycleTab(){
 async function renderCycle(){
   const root=$("#cycleRoot"); if(!root) return;
   root.innerHTML=`<p class="empty" style="padding:48px;text-align:center">Chargement…</p>`;
-  let brigMems=[], brigPlannings={};
   try{
     const [r1,r2]=await Promise.all([
       supa.from("group_members").select("user_id,display_name,crew").eq("group_id",cycleSelGid),
       supa.from("groups").select("crew_names").eq("id",cycleSelGid).single()
     ]);
-    brigMems=(r1.data||[]).sort((a,b)=>(a.display_name||"").localeCompare(b.display_name||""));
+    _cycleBrigMems=(r1.data||[]).sort((a,b)=>(a.display_name||"").localeCompare(b.display_name||""));
     cycleCrewNames=r2.data?.crew_names||["Alpha","Bravo"];
   }catch(e){ cycleCrewNames=["Alpha","Bravo"]; }
-  if(brigMems.length){
+  if(_cycleBrigMems.length){
     try{
-      const {data}=await supa.from("plannings").select("user_id,data").in("user_id",brigMems.map(m=>m.user_id));
-      (data||[]).forEach(p=>brigPlannings[p.user_id]=p.data||{});
+      const {data}=await supa.from("plannings").select("user_id,data").in("user_id",_cycleBrigMems.map(m=>m.user_id));
+      _cycleBrigPlannings={};
+      (data||[]).forEach(p=>_cycleBrigPlannings[p.user_id]=p.data||{});
     }catch(e){}
   }
   const dates=[0,1,2].map(i=>{ const d=new Date(cycleStartDate); d.setDate(d.getDate()+i); return isoOf(d); });
@@ -1850,7 +1851,17 @@ async function renderCycle(){
     const {data}=await supa.from("cycle_notes").select("*").eq("group_id",cycleSelGid).in("date_iso",dates);
     cycleNotes={}; (data||[]).forEach(n=>cycleNotes[n.date_iso]=n);
   }catch(e){ cycleNotes={}; }
+  renderCycleHTML();
+}
 
+function getEffectiveCrew(iso, uid){
+  const a=(cycleNotes[iso]?.crew_assignments)||{};
+  if(uid in a) return a[uid];
+  return (_cycleBrigMems.find(m=>m.user_id===uid)?.crew)||"";
+}
+
+function renderCycleHTML(){
+  const root=$("#cycleRoot"); if(!root) return;
   const g=cycleGroups.find(x=>x.id===cycleSelGid)||{name:"?"};
   const editable=isChef();
   const brigSelHtml=cycleGroups.length>1
@@ -1859,36 +1870,23 @@ async function renderCycle(){
   const d0=new Date(cycleStartDate), dEnd=new Date(cycleStartDate); dEnd.setDate(dEnd.getDate()+2);
   const cycleLabel=capit(d0.toLocaleDateString("fr-FR",{day:"numeric",month:"short"}))+" – "+capit(dEnd.toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"}));
 
-  // Leave types for absent select
   const lvTypes=(state.types||DEFAULT_CONGES.types).filter(t=>t.code);
   const lvOpts=lvTypes.map(t=>`<option value="${escapeHtml(t.code)}">${escapeHtml(t.code)} — ${escapeHtml(t.label||t.code)}</option>`).join("");
 
-  // ===== ÉQUIPAGES SECTION (editable by chef/admin/dev) =====
+  // ===== ÉQUIPAGES SECTION — crew name management only =====
   let crewsHtml="";
   if(editable){
-    const crewBlocks=cycleCrewNames.map(crew=>{
-      const mems=brigMems.filter(m=>m.crew===crew);
-      const sel=(uid,cur)=>`<select class="fc-crew-assign" data-uid="${uid}">${["","..."].concat(cycleCrewNames).filter((v,i,a)=>a.indexOf(v)===i).map(c=>`<option value="${c}"${cur===c?" selected":""}>${c||"— aucun"}</option>`).join("")}</select>`;
-      // Fix: proper opts
-      const assignOpts=(uid,cur)=>`<select class="fc-crew-assign" data-uid="${uid}">${[["","— aucun"],...cycleCrewNames.map(c=>[c,c])].map(([v,l])=>`<option value="${v}"${cur===v?" selected":""}>${l}</option>`).join("")}</select>`;
-      const memHtml=mems.length?mems.map(m=>`<div class="fc-crew-row"><span class="fc-name">${escapeHtml(m.display_name||"?")}</span>${assignOpts(m.user_id,m.crew)}</div>`).join(""):`<span class="fc-empty">Aucun membre</span>`;
-      return `<div class="fc-crew-block"><div class="fc-crew-hd">${escapeHtml(crew)}</div><div class="fc-crew-body">${memHtml}</div></div>`;
-    }).join("");
-    const unassigned=brigMems.filter(m=>!cycleCrewNames.includes(m.crew));
-    const unassHtml=unassigned.length?`<div class="fc-crew-block fc-crew-unassigned">
-      <div class="fc-crew-hd">Non assignés</div>
-      <div class="fc-crew-body">${unassigned.map(m=>`<div class="fc-crew-row">
-        <span class="fc-name">${escapeHtml(m.display_name||"?")}</span>
-        <select class="fc-crew-assign" data-uid="${m.user_id}">${[["","— aucun"],...cycleCrewNames.map(c=>[c,c])].map(([v,l])=>`<option value="${v}"${m.crew===v?" selected":""}>${l}</option>`).join("")}</select>
-      </div>`).join("")}</div></div>`:"";
-    const delBtns=cycleCrewNames.length>2?cycleCrewNames.slice(2).map(c=>`<button class="mini danger fc-del-crew" data-crew="${escapeHtml(c)}">Supprimer ${escapeHtml(c)}</button>`).join(""):"";
+    const crewTags=cycleCrewNames.map(crew=>`<span class="fc-crew-tag">
+      ${escapeHtml(crew)}
+      ${cycleCrewNames.length>1?`<button class="fc-del-crew" data-crew="${escapeHtml(crew)}">×</button>`:""}
+    </span>`).join("");
     crewsHtml=`<div class="card" style="margin-bottom:14px">
       <div class="card-head"><h2>⚓ Équipages — ${escapeHtml(g.name)}</h2></div>
-      <div class="fc-crews">${crewBlocks}${unassHtml}</div>
+      <p class="muted" style="margin:0 0 10px">Gérer les noms d'équipage. L'affectation jour par jour se fait dans les fiches ci-dessous.</p>
+      <div class="fc-crew-tags">${crewTags}</div>
       <div class="fc-add-crew">
-        <input id="newCrewInp" class="fc-add-crew-inp" placeholder="Nom du 3ème équipage…" maxlength="20"/>
+        <input id="newCrewInp" class="fc-add-crew-inp" placeholder="Nom du nouvel équipage…" maxlength="20"/>
         <button class="btn small primary" id="addCrewBtn">+ Créer</button>
-        ${delBtns}
       </div>
     </div>`;
   }
@@ -1900,25 +1898,46 @@ async function renderCycle(){
     const iso=isoOf(dt);
     const note=cycleNotes[iso]||{};
     const dayLabel=capit(dt.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"}));
-    const working={};
-    cycleCrewNames.forEach(c=>{ working[c]=[]; });
-    working.none=[];
+
+    const crewGroups={};
+    cycleCrewNames.forEach(c=>{ crewGroups[c]=[]; });
+    crewGroups.__none=[];
     const planAbsent=[];
-    brigMems.forEach(mem=>{
-      const s=dayStatus(brigPlannings[mem.user_id]||{},iso);
+
+    _cycleBrigMems.forEach(mem=>{
+      const s=dayStatus(_cycleBrigPlannings[mem.user_id]||{},iso);
       if(!s.inRange) return;
-      if(s.leave) planAbsent.push({mem,code:s.leave.code,color:leaveColor(s.leave.code,brigPlannings[mem.user_id]||{})});
-      else if(s.work){ const c=cycleCrewNames.includes(mem.crew)?mem.crew:"none"; working[c].push(mem); }
+      if(s.leave) planAbsent.push({mem,code:s.leave.code,color:leaveColor(s.leave.code,_cycleBrigPlannings[mem.user_id]||{})});
+      else if(s.work){
+        const c=getEffectiveCrew(iso,mem.user_id);
+        const key=cycleCrewNames.includes(c)?c:"__none";
+        crewGroups[key].push(mem);
+      }
     });
+
     const manualAbsents=Array.isArray(note.manual_absents)?note.manual_absents:[];
-    const allWorking=Object.values(working).flat();
+    const allWorking=[...Object.values(crewGroups)].flat();
     const chefOpts=`<option value="">— Chef de poste —</option>`+allWorking.map(m=>`<option value="${escapeHtml(m.display_name||"?")}"${note.chef_poste===(m.display_name||"")?" selected":""}>${escapeHtml(m.display_name||"?")}</option>`).join("");
+
+    const mkCrewSel=(uid)=>`<select class="fc-day-crew-sel" data-fiso="${iso}" data-uid="${uid}">
+      <option value="">— aucun —</option>
+      ${cycleCrewNames.map(c=>`<option value="${c}"${getEffectiveCrew(iso,uid)===c?" selected":""}>${escapeHtml(c)}</option>`).join("")}
+    </select>`;
+
     let teamsHtml=`<div class="fc-teams">`;
     cycleCrewNames.forEach(crew=>{
-      teamsHtml+=`<div class="fc-tv"><div class="fc-tv-hd">${escapeHtml(crew)}</div><div class="fc-tv-body">${working[crew]?.length?working[crew].map(m=>`<span class="fc-name">${escapeHtml(m.display_name||"?")}</span>`).join(""):`<span class="fc-empty">—</span>`}</div></div>`;
+      const mems=crewGroups[crew]||[];
+      teamsHtml+=`<div class="fc-tv"><div class="fc-tv-hd">${escapeHtml(crew)}</div><div class="fc-tv-body">${
+        mems.length?mems.map(m=>`<div class="fc-crew-row-day"><span class="fc-name">${escapeHtml(m.display_name||"?")}</span>${editable?mkCrewSel(m.user_id):""}</div>`).join(""):`<span class="fc-empty">—</span>`
+      }</div></div>`;
     });
-    if(working.none?.length) teamsHtml+=`<div class="fc-tv"><div class="fc-tv-hd">En service</div><div class="fc-tv-body">${working.none.map(m=>`<span class="fc-name">${escapeHtml(m.display_name||"?")}</span>`).join("")}</div></div>`;
+    if(crewGroups.__none?.length){
+      teamsHtml+=`<div class="fc-tv"><div class="fc-tv-hd">En service</div><div class="fc-tv-body">${
+        crewGroups.__none.map(m=>`<div class="fc-crew-row-day"><span class="fc-name">${escapeHtml(m.display_name||"?")}</span>${editable?mkCrewSel(m.user_id):""}</div>`).join("")
+      }</div></div>`;
+    }
     teamsHtml+=`</div>`;
+
     const planAbsentHtml=planAbsent.map(a=>`<span class="fc-absent-item"><span class="fc-name">${escapeHtml(a.mem.display_name||"?")}</span><span class="fc-lbadge" style="background:${a.color}">${escapeHtml(a.code)}</span></span>`).join("");
     const manHtml=manualAbsents.map((a,idx)=>`<span class="fc-absent-item manual"><span class="fc-name">${escapeHtml(a.name)}</span><span class="fc-lbadge" style="background:#6b7480">${escapeHtml(a.code)}</span>${editable?`<button class="fc-absent-rm" data-fiso="${iso}" data-idx="${idx}">×</button>`:""}</span>`).join("");
     const sportCrew=note.sport_crew||"", sportStart=note.sport_start||"", sportEnd=note.sport_end||"";
@@ -1933,6 +1952,7 @@ async function renderCycle(){
           à <input type="time" class="fc-sport-end" data-fiso="${iso}" value="${escapeHtml(sportEnd)}">
         </div>`
       :(sportCrew?`<span class="fc-sport-ro">${escapeHtml(sportCrew)} · ${sportStart||"?"} – ${sportEnd||"?"}</span>`:`<span class="fc-empty">Pas de sport</span>`);
+
     daysHtml+=`<div class="fc-day" data-fiso="${iso}">
       <div class="fc-day-hd">
         <span class="fc-day-label">${dayLabel}</span>
@@ -1972,21 +1992,21 @@ async function renderCycle(){
   ${crewsHtml}
   <div id="fcDays">${daysHtml}</div>`;
 
-  // Nav events
+  // Nav
   $("#cycleBrigSel")?.addEventListener("change",e=>{ cycleSelGid=e.target.value; renderCycle(); });
   $("#cyclePrev")?.addEventListener("click",()=>{ const d=new Date(cycleStartDate); d.setDate(d.getDate()-3); cycleStartDate=d; renderCycle(); });
   $("#cycleNext")?.addEventListener("click",()=>{ const d=new Date(cycleStartDate); d.setDate(d.getDate()+3); cycleStartDate=d; renderCycle(); });
 
-  // Crew assignment
-  $$(".fc-crew-assign").forEach(sel=>{
-    sel.addEventListener("change",async()=>{
-      try{
-        await supa.rpc("set_member_crew",{gid:cycleSelGid,target:sel.dataset.uid,crew_name:sel.value});
-        const mem=brigMems.find(m=>m.user_id===sel.dataset.uid);
-        if(mem) mem.crew=sel.value;
-        // Re-render to update day cards
-        await renderCycle();
-      }catch(e){ alert("Erreur équipage : "+e.message); }
+  // Per-day crew assignment — local update + async save, no re-fetch
+  $$(".fc-day-crew-sel").forEach(sel=>{
+    sel.addEventListener("change",()=>{
+      const iso=sel.dataset.fiso, uid=sel.dataset.uid, val=sel.value;
+      if(!cycleNotes[iso]) cycleNotes[iso]={};
+      if(!cycleNotes[iso].crew_assignments) cycleNotes[iso].crew_assignments={};
+      cycleNotes[iso].crew_assignments[uid]=val;
+      renderCycleHTML();
+      const n=cycleNotes[iso];
+      saveCycleNoteFull(iso,n.chef_poste||"",n.notes||"",n.sport_crew||"",n.sport_start||"",n.sport_end||"",n.manual_absents||[],n.crew_assignments||{});
     });
   });
 
@@ -2001,16 +2021,14 @@ async function renderCycle(){
     }catch(e){ alert("Erreur : "+e.message); }
   });
 
-  // Delete crew
+  // Delete any crew — min 1 guard
   $$(".fc-del-crew").forEach(btn=>{
     btn.addEventListener("click",async()=>{
       const crew=btn.dataset.crew;
+      if(cycleCrewNames.length<=1){ alert("Il doit rester au moins un équipage."); return; }
       if(!confirm(`Supprimer l'équipage "${crew}" ?`)) return;
-      const newNames=cycleCrewNames.filter(c=>c!==crew);
       try{
-        await supa.rpc("update_crew_names",{p_group_id:cycleSelGid,p_names:newNames});
-        const toUnassign=brigMems.filter(m=>m.crew===crew);
-        for(const mem of toUnassign) await supa.rpc("set_member_crew",{gid:cycleSelGid,target:mem.user_id,crew_name:""});
+        await supa.rpc("update_crew_names",{p_group_id:cycleSelGid,p_names:cycleCrewNames.filter(c=>c!==crew)});
         await renderCycle();
       }catch(e){ alert("Erreur : "+e.message); }
     });
@@ -2026,7 +2044,8 @@ async function renderCycle(){
         document.querySelector(`.fc-sport-crew[data-fiso="${iso}"]`)?.value||n.sport_crew||"",
         document.querySelector(`.fc-sport-start[data-fiso="${iso}"]`)?.value||n.sport_start||"",
         document.querySelector(`.fc-sport-end[data-fiso="${iso}"]`)?.value||n.sport_end||"",
-        n.manual_absents||[]
+        n.manual_absents||[],
+        n.crew_assignments||{}
       );
     };
     $$(".fc-chef-sel").forEach(sel=>sel.addEventListener("change",()=>saveFull(sel.dataset.fiso)));
@@ -2035,9 +2054,8 @@ async function renderCycle(){
       const ev=el.tagName==="TEXTAREA"?"input":"change";
       el.addEventListener(ev,()=>{ const iso=el.dataset.fiso; clearTimeout(dbTimers[iso]); dbTimers[iso]=setTimeout(()=>saveFull(iso),700); });
     });
-    // Add absent
     $$(".fc-absent-add").forEach(btn=>{
-      btn.addEventListener("click",async()=>{
+      btn.addEventListener("click",()=>{
         const iso=btn.dataset.fiso;
         const nameInp=document.querySelector(`.fc-absent-name[data-fiso="${iso}"]`);
         const codeInp=document.querySelector(`.fc-absent-code[data-fiso="${iso}"]`);
@@ -2045,32 +2063,35 @@ async function renderCycle(){
         if(!name){ alert("Saisis le nom."); return; }
         const n=getN(iso);
         const newAbs=[...(n.manual_absents||[]),{name,code}];
-        await saveCycleNoteFull(iso,n.chef_poste||"",n.notes||"",n.sport_crew||"",n.sport_start||"",n.sport_end||"",newAbs);
-        if(nameInp) nameInp.value="";
-        await renderCycle();
+        if(!cycleNotes[iso]) cycleNotes[iso]={};
+        cycleNotes[iso].manual_absents=newAbs;
+        renderCycleHTML();
+        saveCycleNoteFull(iso,n.chef_poste||"",n.notes||"",n.sport_crew||"",n.sport_start||"",n.sport_end||"",newAbs,n.crew_assignments||{});
       });
     });
-    // Remove absent
     $$(".fc-absent-rm").forEach(btn=>{
-      btn.addEventListener("click",async()=>{
+      btn.addEventListener("click",()=>{
         const iso=btn.dataset.fiso, idx=parseInt(btn.dataset.idx,10);
         const n=getN(iso);
         const newAbs=(n.manual_absents||[]).filter((_,i)=>i!==idx);
-        await saveCycleNoteFull(iso,n.chef_poste||"",n.notes||"",n.sport_crew||"",n.sport_start||"",n.sport_end||"",newAbs);
-        await renderCycle();
+        if(!cycleNotes[iso]) cycleNotes[iso]={};
+        cycleNotes[iso].manual_absents=newAbs;
+        renderCycleHTML();
+        saveCycleNoteFull(iso,n.chef_poste||"",n.notes||"",n.sport_crew||"",n.sport_start||"",n.sport_end||"",newAbs,n.crew_assignments||{});
       });
     });
   }
 }
 
-async function saveCycleNoteFull(iso,chef,notes,sportCrew,sportStart,sportEnd,manualAbsents){
+async function saveCycleNoteFull(iso,chef,notes,sportCrew,sportStart,sportEnd,manualAbsents,crewAssignments){
+  crewAssignments=crewAssignments||{};
   try{
     await supa.rpc("save_cycle_note",{p_group_id:cycleSelGid,p_date_iso:iso,
       p_chef:chef,p_notes:notes,p_sport_crew:sportCrew,p_sport_start:sportStart,p_sport_end:sportEnd,
-      p_manual_absents:manualAbsents
+      p_manual_absents:manualAbsents,p_crew_assignments:crewAssignments
     });
     if(!cycleNotes[iso]) cycleNotes[iso]={};
-    Object.assign(cycleNotes[iso],{chef_poste:chef,notes,sport_crew:sportCrew,sport_start:sportStart,sport_end:sportEnd,manual_absents:manualAbsents});
+    Object.assign(cycleNotes[iso],{chef_poste:chef,notes,sport_crew:sportCrew,sport_start:sportStart,sport_end:sportEnd,manual_absents:manualAbsents,crew_assignments:crewAssignments});
   }catch(e){ console.warn("cycle_note:",e.message); }
 }
 
